@@ -51,6 +51,12 @@
     return null;
   }
 
+  function loadDeepRevision() {
+    if (typeof globalThis !== "undefined" && globalThis.DeepRevision) return globalThis.DeepRevision;
+    if (typeof require === "function") return require("./deep-revision.js");
+    return null;
+  }
+
   function loadRewriter() {
     if (typeof globalThis !== "undefined" && globalThis.StructuralRewriter) return globalThis.StructuralRewriter;
     if (typeof require === "function") return require("./rewriter.js");
@@ -208,6 +214,44 @@
     return spans;
   }
 
+  const DEFAULT_DEEP_LIMIT = 12;
+
+  function wordTokens(text, language) {
+    const deep = loadDeepRevision();
+    return deep ? deep.wordTokens(text, language) : [];
+  }
+
+  function lexicalNovelty(source, candidate, language) {
+    const deep = loadDeepRevision();
+    return deep ? deep.lexicalNovelty(source, candidate, language) : 0;
+  }
+
+  function stableLongVocabulary(source, candidate, language) {
+    const deep = loadDeepRevision();
+    return Boolean(deep && deep.stableVocabulary(source, candidate, language));
+  }
+
+  function freshCandidateProfile(source, candidate, language) {
+    const deep = loadDeepRevision();
+    const paraphraser = loadParaphraser();
+    if (!deep) return { safe: false, novelty: 0, lengthRatio: 0, sameLanguage: false, stableVocabulary: false, naturalOpening: false, sentenceCount: 0 };
+    return deep.candidateProfile(source, candidate, {
+      language,
+      sentenceCount: sentenceSpansOf(candidate).length,
+      detectLanguage: paraphraser ? (text) => paraphraser.detectLanguage(text) : null,
+    });
+  }
+
+  function syntacticReorderVariants(sentence, language) {
+    const deep = loadDeepRevision();
+    return deep ? deep.syntacticReorderVariants(sentence, language) : [];
+  }
+
+  function deepSpotsOf(source, spans, weakSpots, settings, language) {
+    const deep = loadDeepRevision();
+    return deep ? deep.deepSpotsOf(source, spans, weakSpots, settings, language) : [];
+  }
+
   /** Версии одного предложения. Слой зачинов сюда не входит: он работает с парой соседей. */
   function sentenceVariants(sentence, language) {
     const paraphraser = loadParaphraser();
@@ -247,26 +291,54 @@
     const guard = loadAnchorGuard();
     const language = settings.language || (loadParaphraser() ? loadParaphraser().detectLanguage(source) : "ru");
     const score = settings.score || deterministicScorer(language);
-    const limit = Math.max(1, Math.min(settings.limit || 5, 12));
+    const limit = Math.max(1, Math.min(settings.limit || 5, DEFAULT_DEEP_LIMIT));
 
     const spans = sentenceSpansOf(source);
     if (!spans.length || !weakSpots) {
-      return Promise.resolve({ text: source, replaced: 0, details: [], ok: true, warnings: [] });
+      return Promise.resolve({
+        text: source,
+        replaced: 0,
+        targeted: 0,
+        totalSentences: spans.length,
+        changedWordShare: 0,
+        generatorWarnings: [],
+        details: [],
+        ok: true,
+        warnings: [],
+      });
     }
 
-    const worst = weakSpots.worst(source, { language, share: 1, limit });
+    const worst = settings.preferFresh
+      ? deepSpotsOf(source, spans, weakSpots, settings, language)
+      : weakSpots.worst(source, { language, share: 1, limit });
     // Источник версий может быть не один: детерминированные правила всегда,
     // генеративная модель — если её подключили через settings.generate.
     // Контракт хука: generate(sentence) -> Promise<string[]>. Всё, что он
     // вернёт, проходит тот же гард якорей, что и правила: модель не имеет
     // права ни поменять число, ни добавить новое.
-    const prepared = worst.map((spot) => {
-      const span = spans.find((item) => item.text.trim() === spot.text.trim());
+    const prepared = worst.map((spot, targetIndex) => {
+      const indexedSpan = Number.isInteger(spot.index) ? spans[spot.index] : null;
+      const span = indexedSpan && indexedSpan.text.trim() === spot.text.trim()
+        ? indexedSpan
+        : spans.find((item) => item.text.trim() === spot.text.trim());
       if (!span) return Promise.resolve(null);
       const original = span.text.trim();
       const rules = sentenceVariants(original, language);
+      if (settings.preferFresh) {
+        for (const variant of syntacticReorderVariants(original, language)) {
+          if (!rules.includes(variant) && (!guard || guard.compare(original, variant).ok)) rules.push(variant);
+        }
+      }
+      let generatorWarning = "";
       const extra = settings.generate
-        ? Promise.resolve(settings.generate(original, { language })).catch(() => [])
+        ? Promise.resolve(settings.generate(original, {
+          language,
+          position: targetIndex + 1,
+          total: worst.length,
+        })).catch((error) => {
+          generatorWarning = error instanceof Error ? error.message : "локальный генератор не ответил";
+          return [];
+        })
         : Promise.resolve([]);
       return extra.then((generated) => {
         const seen = new Set([original, ...rules]);
@@ -278,21 +350,35 @@
           if (guard && !guard.compare(original, value).ok) continue;
           accepted.push(value);
         }
-        return accepted.length ? { span, original, variants: accepted, reasons: spot.reasons } : null;
+        return accepted.length || generatorWarning || (Array.isArray(generated) && generated.length)
+          ? { span, original, variants: accepted, generatorWarning, reasons: spot.reasons }
+          : null;
       });
     });
 
     return Promise.all(prepared).then((resolved) => {
       const targets = resolved.filter(Boolean);
       if (!targets.length) {
-        return { text: source, replaced: 0, details: [], ok: true, warnings: [] };
+        return {
+          text: source,
+          replaced: 0,
+          targeted: worst.length,
+          totalSentences: spans.length,
+          changedWordShare: 0,
+          generatorWarnings: [],
+          details: [],
+          ok: true,
+          warnings: [],
+        };
       }
-      return scoreAndReplace(source, targets, score, guard);
+      return scoreAndReplace(source, targets, score, guard, settings, spans.length);
     });
   }
 
   /** Пакетная оценка версий и замена тех предложений, где нашлось лучше. */
-  function scoreAndReplace(source, targets, score, guard) {
+  function scoreAndReplace(source, targets, score, guard, options, totalSentences) {
+    const settings = options || {};
+    const generatorWarnings = [...new Set(targets.map((target) => target.generatorWarning).filter(Boolean))];
 
     // Один пакет на всё: оригиналы и версии подряд, границы запоминаются.
     const batch = [];
@@ -313,14 +399,27 @@
         for (let index = 0; index < target.variants.length; index += 1) {
           const value = Number(scores[target.offset + 1 + index]);
           if (!Number.isFinite(value)) continue;
-          if (!best || value < best.score) best = { text: target.variants[index], score: value };
+          if (settings.preferFresh) {
+            const profile = freshCandidateProfile(target.original, target.variants[index], settings.language);
+            if (!profile.safe || !Number.isFinite(baseline) || value > baseline + 4) continue;
+            const objective = value - profile.novelty * 30 + Math.abs(1 - profile.lengthRatio) * 6;
+            if (!best || objective < best.objective) {
+              best = { text: target.variants[index], score: value, objective, profile };
+            }
+          } else if (!best || value < best.score) {
+            best = { text: target.variants[index], score: value };
+          }
         }
-        if (!best || !Number.isFinite(baseline) || best.score >= baseline) continue;
+        const gain = settings.preferFresh && best
+          ? baseline - best.objective
+          : best ? baseline - best.score : 0;
+        if (!best || !Number.isFinite(baseline) || gain <= 0) continue;
         replacements.push({ span: target.span, text: best.text });
         details.push({
           before: target.original,
           after: best.text,
-          gain: Math.round((baseline - best.score) * 1000) / 1000,
+          gain: Math.round(gain * 1000) / 1000,
+          novelty: best.profile ? Math.round(best.profile.novelty * 1000) / 1000 : null,
           reasons: target.reasons,
         });
       }
@@ -337,12 +436,28 @@
         return {
           text: source,
           replaced: 0,
+          targeted: targets.length,
+          totalSentences,
+          changedWordShare: 0,
+          generatorWarnings,
           details: [],
           ok: false,
           warnings: [`Полировка отменена целиком: ${guard.describe(check)}.`],
         };
       }
-      return { text: result, replaced: replacements.length, details, ok: true, warnings: [] };
+      const changedWords = details.reduce((sum, detail) => sum + wordTokens(detail.before, settings.language).length, 0);
+      const totalWords = wordTokens(source, settings.language).length;
+      return {
+        text: result,
+        replaced: replacements.length,
+        targeted: targets.length,
+        totalSentences,
+        changedWordShare: totalWords ? changedWords / totalWords : 0,
+        generatorWarnings,
+        details,
+        ok: true,
+        warnings: [],
+      };
     });
   }
 
@@ -384,6 +499,11 @@
     improveSync,
     polishSentences,
     sentenceVariants,
+    lexicalNovelty,
+    freshCandidateProfile,
+    stableLongVocabulary,
+    syntacticReorderVariants,
+    deepSpotsOf,
     deterministicScorer,
     perplexityScorer,
     bestAvailableScorer,

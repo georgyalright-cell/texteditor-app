@@ -41,7 +41,7 @@
   }
 
   function lockForPolish() {
-    if (busy || pending.size) return false;
+    if (lockedForPolish || busy || pending.size) return false;
     lockedForPolish = true;
     if (worker) worker.terminate();
     worker = null;
@@ -98,7 +98,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker("neural-worker.js?v=18");
+    worker = new Worker("neural-worker.js?v=19");
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "progress") {
@@ -152,7 +152,7 @@
       setStatus("WebGPU недоступен. Обычная обработка продолжает работать без нейромоделей.", true);
     } else {
       setStatus(
-        "Оценка при первом запуске загрузит около 1 ГБ. Генератор формулировок — ещё около 500 МБ только при его запуске.",
+        "Оценка при первом запуске загрузит около 1 ГБ. Генератор формулировок — ещё около 880 МБ только при его запуске.",
         false,
       );
     }

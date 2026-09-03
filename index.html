@@ -11,7 +11,7 @@
     />
     <meta name="referrer" content="no-referrer" />
     <title>TextEditor — обработка и сборка работ</title>
-    <link rel="stylesheet" href="styles.css?v=17" />
+    <link rel="stylesheet" href="styles.css?v=20" />
     <link rel="stylesheet" href="workspace.css?v=17" />
     <link rel="stylesheet" href="review.css?v=17" />
     <link rel="stylesheet" href="neural-scorer.css?v=17" />
@@ -194,6 +194,12 @@
           <button class="button button-primary" id="processButton" type="button" disabled>
             Обработать текст
           </button>
+          <button class="button button-accent" id="polishButton" type="button" disabled hidden>
+            Глубоко переработать формулировки
+          </button>
+          <p class="polish-download-note" id="polishDownloadNote" hidden>
+            Первый запуск: загрузка около 880 МБ и несколько минут ожидания. Затем модель останется в кэше браузера.
+          </p>
           <button class="button button-accent" id="addPartButton" type="button" disabled hidden>
             Добавить часть в работу
           </button>
@@ -249,7 +255,6 @@
               <button class="button button-secondary" id="acceptSafeButton" type="button">Принять безопасные</button>
               <button class="button button-secondary" id="clearEditsButton" type="button">Снять все</button>
               <button class="button button-secondary" id="saveRevisionButton" type="button">Сохранить версию</button>
-              <button class="button button-secondary" id="polishButton" type="button">Отобрать формулировки моделью</button>
             </div>
             <p class="edits-guard" id="editsGuard" aria-live="polite"></p>
             <ul class="edit-list" id="editList"></ul>
@@ -317,7 +322,7 @@
             <li>собирает <code>.docx</code> с полями 2/2/3/1.5 см, Times New Roman 12 pt, интервалом 1.15 и нумерацией страниц.</li>
           </ul>
           <p>Содержание разделов не сочиняется. В режиме сборки инструмент объединяет только предоставленные материалы и явно отмечает всё, чего не хватает.</p>
-          <p>Нейрооценка включается отдельно и загружает около 1 ГБ. Генератор формулировок загружается только по своей кнопке и добавляет около 500 МБ. Браузер обычно сохраняет модели в кэше, но может удалить их при очистке данных или нехватке места.</p>
+          <p>Глубокая редакция включается отдельной заметной кнопкой после базовой обработки и при первом запуске загружает генератор около 880 МБ. Подготовка может занять несколько минут. Затем модель остаётся в кэше и перестраивает формулировки примерно в трети подходящих предложений. Нейрооценка перплексии включается отдельно и загружает ещё около 1 ГБ. Браузер может удалить кэш при очистке данных или нехватке места.</p>
         </div>
       </details>
     </main>
@@ -342,6 +347,7 @@
           <ol>
             <li>Вставьте черновик или выберите файл.</li>
             <li>Нажмите «Обработать текст».</li>
+            <li>Для заметно новой формулировки нажмите «Глубоко переработать формулировки». При первом запуске браузер загрузит около 880 МБ; подготовка может занять несколько минут.</li>
             <li>Просмотрите результат и отчёт; при необходимости примите предложенные правки.</li>
             <li>Скачайте итог в DOCX или TXT.</li>
           </ol>
@@ -383,7 +389,8 @@
     <script src="processor.js?v=18" defer></script>
     <script src="paraphraser.js?v=18" defer></script>
     <script src="rewriter.js?v=18" defer></script>
-    <script src="candidate-select.js?v=18" defer></script>
+    <script src="deep-revision.js?v=20" defer></script>
+    <script src="candidate-select.js?v=20" defer></script>
     <script src="weak-spots.js?v=18" defer></script>
     <script src="usage-baseline.js?v=18" defer></script>
     <script src="humanizer-engine.js?v=18" defer></script>
@@ -394,11 +401,11 @@
     <script src="document-reader.js?v=18" defer></script>
     <script src="work-project.js?v=18" defer></script>
     <script src="project-view.js?v=18" defer></script>
-    <script src="neural-scorer.js?v=18" defer></script>
-    <script src="generator-core.js?v=18" defer></script>
-    <script src="generator.js?v=18" defer></script>
-    <script src="review-ui.js?v=18" defer></script>
+    <script src="neural-scorer.js?v=19" defer></script>
+    <script src="generator-core.js?v=21" defer></script>
+    <script src="generator.js?v=33" defer></script>
+    <script src="review-ui.js?v=20" defer></script>
     <script src="help-dialog.js?v=18" defer></script>
-    <script src="app.js?v=18" defer></script>
+    <script src="app.js?v=20" defer></script>
   </body>
 </html>

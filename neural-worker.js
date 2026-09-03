@@ -2,7 +2,7 @@
 
 importScripts("./neural-scorer-core.js?v=18");
 
-const TRANSFORMERS_URL = "./vendor/transformers/transformers.web.min.mjs?v=18";
+const TRANSFORMERS_URL = "./vendor/transformers/transformers.web.min.mjs?v=19";
 const OBSERVER_MODEL = "onnx-community/Qwen2.5-0.5B-ONNX";
 const OBSERVER_REVISION = "edb2f22b84411a7990bd63bf64c6a471fbd13ecc";
 const PERFORMER_MODEL = "onnx-community/Qwen2.5-0.5B-Instruct-ONNX";

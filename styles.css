@@ -295,11 +295,22 @@ summary:focus-visible,
   border-top: 1px solid var(--line);
   padding: 23px 31px;
   display: grid;
-  grid-template-columns: minmax(200px, 280px) repeat(3, minmax(150px, 214px));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 214px));
   justify-content: end;
   align-items: center;
   gap: 11px;
   background: #fbfbfc;
+}
+
+.polish-download-note {
+  grid-column: 1 / -1;
+  justify-self: end;
+  max-width: 440px;
+  margin: -3px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: right;
 }
 
 .button {
@@ -719,7 +730,7 @@ summary:focus-visible,
   }
 
   .action-rail {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 }
 
@@ -799,6 +810,12 @@ summary:focus-visible,
 
   .button {
     grid-column: 1 / -1;
+  }
+
+  .polish-download-note {
+    justify-self: stretch;
+    max-width: none;
+    text-align: left;
   }
 
   .download-button {

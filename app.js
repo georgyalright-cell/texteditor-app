@@ -269,6 +269,7 @@
     elements.assemblySummary.hidden = true;
     elements.assemblySummary.textContent = "";
     if (window.NeuralScorerUI) window.NeuralScorerUI.setTexts("", "");
+    if (window.ReviewUI && typeof window.ReviewUI.reset === "function") window.ReviewUI.reset();
     activeReview = null;
     if (elements.review) elements.review.hidden = true;
   }
@@ -332,9 +333,12 @@
     currentOutputProfileId = context.profileId;
     showResult(structured.text);
     if (window.NeuralScorerUI) window.NeuralScorerUI.setTexts(context.source, structured.text);
+    const deep = review && review.deepRevision;
     setResultState(
-      structured.text === context.source ? "Готово · без замен" : "Готово · текст изменён",
-      structured.text === context.source ? "neutral" : "success",
+      deep
+        ? `Глубокая редакция · обновлено ${deep.replaced}`
+        : structured.text === context.source ? "Базовая правка · без замен" : "Базовая правка · текст изменён",
+      structured.text === context.source && !deep ? "neutral" : "success",
     );
     renderCompliance(structured.report);
     renderMetrics(window.HumanizerMetrics.scoreText(text, context.processed.language), context.processed.metricsBefore);

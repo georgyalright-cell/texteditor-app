@@ -27,7 +27,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new root.Worker("generator-worker.js?v=18");
+    worker = new root.Worker("generator-worker.js?v=33", { type: "module" });
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "progress") {
@@ -39,7 +39,6 @@
       pending.delete(message.id);
       if (message.type === "variants") waiting.resolve(Array.isArray(message.variants) ? message.variants : []);
       else waiting.reject(new Error(message.message || "Локальный генератор не выполнил запрос."));
-      if (!pending.size && worker) worker.postMessage({ type: "release" });
     });
     worker.addEventListener("error", (event) => {
       const error = new Error(event.message || "Ошибка локального генератора.");
@@ -48,6 +47,10 @@
       worker = null;
     });
     return worker;
+  }
+
+  function release() {
+    if (worker && !pending.size) worker.postMessage({ type: "release" });
   }
 
   function paraphrase(sentence, options) {
@@ -66,6 +69,8 @@
         sentence: source,
         language: settings.language === "en" ? "en" : "ru",
         count,
+        position: Number(settings.position) || null,
+        total: Number(settings.total) || null,
       });
     }).catch((error) => {
       report({ message: `Генератор недоступен: ${error.message}. Продолжаю со словарными версиями.`, isError: true });
@@ -73,5 +78,5 @@
     });
   }
 
-  return { supported, paraphrase };
+  return { supported, paraphrase, release };
 });

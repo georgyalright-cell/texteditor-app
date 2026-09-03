@@ -1,13 +1,31 @@
 "use strict";
 
-importScripts("./generator-core.js?v=18");
+import "./generator-core.js?v=21";
+import { CreateMLCEngine } from "./vendor/webllm/web-llm.mjs";
 
-const TRANSFORMERS_URL = "./vendor/transformers/transformers.web.min.mjs?v=18";
-const GENERATOR_MODEL = "onnx-community/Qwen2.5-0.5B-Instruct";
-const GENERATOR_REVISION = "cc5cc01a65cc3ff17bdb73a7de33d879f62599b0";
-const MAX_NEW_TOKENS = 256;
+const GENERATOR_MODEL = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
+const GENERATOR_REVISION = "9bd564b064631febf14deadcac492efb761d60c3";
+const MODEL_URL =
+  `https://huggingface.co/mlc-ai/Qwen2.5-1.5B-Instruct-q4f16_1-MLC/resolve/${GENERATOR_REVISION}`;
+const MODEL_LIBRARY = new URL(
+  "./vendor/webllm/Qwen2-1.5B-Instruct-q4f16_1-ctx4k_cs1k-webgpu.wasm",
+  self.location.href,
+).href;
+const MAX_NEW_TOKENS = 160;
 
-let generator = null;
+const APP_CONFIG = {
+  model_list: [{
+    model: MODEL_URL,
+    model_id: GENERATOR_MODEL,
+    model_lib: MODEL_LIBRARY,
+    low_resource_required: true,
+    vram_required_MB: 1630,
+    overrides: { context_window_size: 2048 },
+  }],
+  useIndexedDBCache: false,
+};
+
+let engine = null;
 let loading = null;
 let queue = Promise.resolve();
 
@@ -15,38 +33,36 @@ function send(type, detail) {
   self.postMessage({ type, ...detail });
 }
 
-function progressReporter(event) {
-  const progress = Number.isFinite(event && event.progress) ? Math.round(event.progress) : null;
-  const filename = event && event.file ? String(event.file).split("/").pop() : "";
+function progressReporter(report) {
+  const raw = Number(report && report.progress);
+  const progress = Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw * 100))) : null;
+  const detail = String((report && report.text) || "").replace(/\s+/gu, " ").trim();
   send("progress", {
     progress,
-    message: `Генератор · загрузка${filename ? ` ${filename}` : ""}${progress === null ? "" : ` · ${progress}%`}`,
+    message: `Генератор · первая загрузка и подготовка${progress === null ? "" : ` · ${progress}%`}${detail ? ` · ${detail}` : ""}`,
   });
 }
 
 async function loadGenerator() {
-  if (generator) return generator;
+  if (engine) return engine;
   if (loading) return loading;
   loading = (async () => {
-    send("progress", { progress: null, message: "Подключаю локальный генератор формулировок…" });
-    const transformers = await import(TRANSFORMERS_URL);
-    transformers.env.backends.onnx.wasm.wasmPaths = {
-      mjs: new URL("./vendor/transformers/ort-wasm-simd-threaded.asyncify.mjs", self.location.href).href,
-      wasm: new URL("./vendor/transformers/ort-wasm-simd-threaded.asyncify.wasm", self.location.href).href,
-    };
-    generator = await transformers.pipeline("text-generation", GENERATOR_MODEL, {
-      device: "webgpu",
-      dtype: "q4f16",
-      revision: GENERATOR_REVISION,
-      progress_callback: progressReporter,
+    send("progress", {
+      progress: null,
+      message: "Подключаю локальный генератор. При первом запуске нужно скачать около 880 МБ…",
     });
-    send("progress", { progress: null, message: "Генератор загружен. Готовлю варианты…" });
-    return generator;
+    engine = await CreateMLCEngine(GENERATOR_MODEL, {
+      appConfig: APP_CONFIG,
+      initProgressCallback: progressReporter,
+      logLevel: "WARN",
+    });
+    send("progress", { progress: null, message: "Генератор готов. Создаю новые формулировки…" });
+    return engine;
   })();
   try {
     return await loading;
   } catch (error) {
-    generator = null;
+    engine = null;
     throw error;
   } finally {
     loading = null;
@@ -58,23 +74,33 @@ async function paraphrase(request) {
     const sentence = String(request.sentence || "").trim();
     if (!sentence) throw new Error("Предложение для перефразирования пусто.");
     const count = self.GeneratorCore.variantCount(request.count);
-    const pipeline = await loadGenerator();
+    const localEngine = await loadGenerator();
+    const position = Number(request.position);
+    const total = Number(request.total);
+    const stage = Number.isFinite(position) && Number.isFinite(total)
+      ? ` · предложение ${position} из ${total}`
+      : "";
     send("progress", {
       progress: null,
-      message: `Генерирую до ${count} вариантов одного предложения…`,
+      message: `Глубокая редакция${stage}: создаю ${count} варианта…`,
     });
-    const output = await pipeline(self.GeneratorCore.buildMessages(sentence, {
-      language: request.language,
-      count,
-    }), {
-      max_new_tokens: MAX_NEW_TOKENS,
-      do_sample: true,
-      temperature: 0.75,
+    const response = await localEngine.chat.completions.create({
+      messages: self.GeneratorCore.buildMessages(sentence, {
+        language: request.language,
+        count: 1,
+      }),
+      model: GENERATOR_MODEL,
+      n: count,
+      max_tokens: MAX_NEW_TOKENS,
+      temperature: 0.62,
       top_p: 0.9,
       repetition_penalty: 1.08,
-      return_full_text: false,
+      seed: 20260903 + (Number(request.id) || 0),
     });
-    const variants = self.GeneratorCore.parseVariants(output, { sentence, count });
+    const raw = Array.isArray(response && response.choices)
+      ? response.choices.map((choice) => choice && choice.message && choice.message.content)
+      : [];
+    const variants = self.GeneratorCore.parseVariants(raw, { sentence, count });
     send("variants", { id: request.id, variants });
   } catch (error) {
     send("error", {
@@ -85,15 +111,15 @@ async function paraphrase(request) {
 }
 
 async function releaseGenerator() {
-  if (generator && typeof generator.dispose === "function") await generator.dispose();
-  generator = null;
+  if (engine && typeof engine.unload === "function") await engine.unload();
+  engine = null;
 }
 
 self.addEventListener("message", (event) => {
   const request = event.data || {};
   if (request.type === "release") {
     queue = queue.then(releaseGenerator).catch(() => {
-      generator = null;
+      engine = null;
     });
     return;
   }

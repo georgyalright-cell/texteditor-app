@@ -100,7 +100,13 @@
   }
 
   function reviewMessage(review) {
-    if (!review || !review.editsTotal) return "";
+    if (!review) return "";
+    if (review.deepRevision) {
+      const deep = review.deepRevision;
+      const share = Math.round((deep.changedWordShare || 0) * 100);
+      return `Глубокая редакция: обновлено ${deep.replaced} из ${deep.totalSentences} предложений, охвачено около ${share}% слов.`;
+    }
+    if (!review.editsTotal) return "";
     if (!review.editsAccepted) return `Композиционные правки предложены (${review.editsTotal}), но ни одна не принята.`;
     const label = pluralForm(review.editsAccepted, "правка", "правки", "правок");
     const share = Math.round((review.applied.removedShare || 0) * 100);

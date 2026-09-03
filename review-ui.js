@@ -27,6 +27,8 @@
     context: {},
     workingText: "",
     report: null,
+    deepRevision: null,
+    operation: 0,
   };
 
   let callbacks = {};
@@ -404,15 +406,20 @@
         baseReport: state.baseReport,
         editsAccepted: edits.filter((edit) => edit.accepted).length,
         editsTotal: edits.length,
+        deepRevision: state.deepRevision,
       });
     }
   }
 
   function update(baseText, context) {
     if (!metricsApi() || !passesApi()) return;
+    state.operation += 1;
     state.baseText = String(baseText || "");
     state.context = context || {};
+    state.deepRevision = state.context.deepRevision || null;
     nodes.review.hidden = !state.baseText.trim();
+    if (nodes.polishButton) nodes.polishButton.hidden = !state.baseText.trim();
+    if (nodes.polishDownloadNote) nodes.polishDownloadNote.hidden = !state.baseText.trim();
     if (!state.baseText.trim()) return;
 
     state.baseReport = metricsApi().analyze(state.baseText, { genreId: genreId() });
@@ -426,16 +433,33 @@
     rebuild();
   }
 
+  function reset() {
+    state.operation += 1;
+    state.baseText = "";
+    state.baseReport = null;
+    state.proposal = null;
+    state.accepted = new Set();
+    state.context = {};
+    state.workingText = "";
+    state.report = null;
+    state.deepRevision = null;
+    if (nodes.review) nodes.review.hidden = true;
+    if (nodes.polishButton) {
+      nodes.polishButton.hidden = true;
+      nodes.polishButton.textContent = "Глубоко переработать формулировки";
+    }
+    if (nodes.polishDownloadNote) nodes.polishDownloadNote.hidden = true;
+  }
+
   /**
-   * Отбор формулировок локальной моделью. Отдельной кнопкой, а не частью
-   * обычного прогона: одна оценка — два прохода модели, и на документе это
-   * минуты. Результат становится новым исходником панели, потому что после
-   * замены предложений прежние спаны правок указывают не туда.
+   * Глубокая редакция формулировок локальной моделью. Она остаётся отдельным
+   * осознанным шагом, чтобы обычная обработка не начинала скрытую загрузку
+   * модели. Результат становится новым исходником панели: после замены
+   * предложений прежние спаны композиционных правок уже указывают не туда.
    */
   function polishWithModel() {
     const selector = root.CandidateSelect;
-    const scorer = selector && selector.perplexityScorer(root.NeuralScorerUI);
-    if (!selector || !scorer || !state.workingText) return;
+    if (!selector || !state.workingText) return;
     if (root.NeuralScorerUI.lockForPolish && !root.NeuralScorerUI.lockForPolish()) {
       nodes.editsGuard.classList.add("is-error");
       nodes.editsGuard.textContent = "Дождитесь завершения текущей нейрооценки и повторите отбор формулировок.";
@@ -445,42 +469,64 @@
       ? (sentence, options) => root.Generator.paraphrase(sentence, {
         language: options && options.language,
         count: 4,
+        position: options && options.position,
+        total: options && options.total,
       })
       : undefined;
+    const operation = state.operation;
 
     nodes.polishButton.disabled = true;
     const label = nodes.polishButton.textContent;
-    nodes.polishButton.textContent = "Считаю варианты…";
+    nodes.polishButton.textContent = "Глубокая редакция…";
     nodes.editsGuard.classList.remove("is-error");
-    nodes.editsGuard.textContent = "Модель оценивает версии худших предложений. Это занимает секунды на вариант.";
+    nodes.editsGuard.textContent =
+      "Модель распределённо перестраивает формулировки. Числа, ссылки, имена, язык и объём остаются под защитой.";
 
     selector
       .polishSentences(state.workingText, {
         language: state.report.language,
-        score: scorer,
         generate,
-        limit: 5,
+        preferFresh: true,
+        share: 0.35,
+        limit: 12,
       })
       .then((result) => {
+        if (operation !== state.operation) return;
         if (!result.ok) {
           nodes.editsGuard.classList.add("is-error");
           nodes.editsGuard.textContent = result.warnings.join(" ");
           return;
         }
         if (!result.replaced) {
-          nodes.editsGuard.textContent =
-            "Модель не нашла версии лучше исходной ни для одного предложения. Дальше решает содержание.";
+          const warning = result.generatorWarnings && result.generatorWarnings[0];
+          nodes.editsGuard.classList.toggle("is-error", Boolean(warning));
+          nodes.editsGuard.textContent = warning
+            ? `Локальная модель не запустилась: ${warning}. Текст оставлен без изменений.`
+            : "Глубокая редакция не нашла достаточно отличающихся безопасных вариантов. Исходный смысл оставлен без риска.";
           return;
         }
+        const share = Math.round((result.changedWordShare || 0) * 100);
+        const deepRevision = {
+          replaced: result.replaced,
+          targeted: result.targeted,
+          totalSentences: result.totalSentences,
+          changedWordShare: result.changedWordShare,
+        };
+        update(result.text, Object.assign({}, state.context, { deepRevision }));
         nodes.editsGuard.textContent =
-          `Отобрано формулировок: ${result.replaced}. Текст стал менее предсказуемым по оценке модели.`;
-        update(result.text, state.context);
+          `Глубокая редакция: обновлено ${result.replaced} из ${result.totalSentences} предложений, охвачено около ${share}% слов. ` +
+          "Фактчек-гард сохранён." +
+          (result.generatorWarnings && result.generatorWarnings.length
+            ? ` Часть запросов модели завершилась ошибкой: ${result.generatorWarnings[0]}.`
+            : "");
       })
       .catch((error) => {
+        if (operation !== state.operation) return;
         nodes.editsGuard.classList.add("is-error");
         nodes.editsGuard.textContent = `Отбор не выполнен: ${error.message}`;
       })
       .then(() => {
+        if (root.Generator && typeof root.Generator.release === "function") root.Generator.release();
         if (root.NeuralScorerUI && typeof root.NeuralScorerUI.reportProgress === "function") {
           root.NeuralScorerUI.reportProgress({ done: true });
         }
@@ -513,6 +559,7 @@
       weakNote: document.querySelector("#weakNote"),
       weakCount: document.querySelector("#weakCount"),
       polishButton: document.querySelector("#polishButton"),
+      polishDownloadNote: document.querySelector("#polishDownloadNote"),
       reviewBaseline: document.querySelector("#reviewBaseline"),
       acceptSafeButton: document.querySelector("#acceptSafeButton"),
       clearEditsButton: document.querySelector("#clearEditsButton"),
@@ -536,14 +583,17 @@
       rebuild();
     });
     if (nodes.polishButton) {
-      const scorerAvailable = root.NeuralScorerUI && root.NeuralScorerUI.supported && root.NeuralScorerUI.supported();
-      if (!scorerAvailable) {
+      nodes.polishButton.hidden = true;
+      const generatorAvailable = root.Generator && root.Generator.supported && root.Generator.supported();
+      nodes.polishButton.disabled = !generatorAvailable;
+      if (!generatorAvailable) {
         nodes.polishButton.disabled = true;
         nodes.polishButton.title =
-          "Нужен WebGPU: отбор формулировок идёт локальной моделью. Остальная обработка работает без неё.";
+          "Нужен WebGPU: глубокая редакция идёт локальной моделью. Остальная обработка работает без неё.";
       }
       nodes.polishButton.addEventListener("click", polishWithModel);
     }
+    if (nodes.polishDownloadNote) nodes.polishDownloadNote.hidden = true;
     nodes.saveRevisionButton.addEventListener("click", () => {
       const store = root.RevisionStore;
       if (!store || !state.workingText) return;
@@ -557,5 +607,5 @@
     });
   }
 
-  root.ReviewUI = { mount, update, genreId, currentText: () => state.workingText };
+  root.ReviewUI = { mount, update, reset, genreId, currentText: () => state.workingText };
 })(typeof globalThis !== "undefined" ? globalThis : window);
