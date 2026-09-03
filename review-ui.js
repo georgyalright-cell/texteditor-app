@@ -89,7 +89,7 @@
     const genre = metricsApi().genre(report.genreId);
     nodes.reviewSummary.textContent =
       `${report.words} слов, ${report.sentences} предложений, ${report.paragraphs} абзацев. ` +
-      `В зоне ${report.counts.ok} метрик из ${report.metrics.length}. ${genre.note}` +
+      `В зоне ${report.counts.ok} метрик из ${report.counts.measurable}${report.counts.unknown ? ` (ещё ${report.counts.unknown} нечего измерять — текста мало)` : ""}. ${genre.note}` +
       (report.calibrated
         ? ` Пороги откалиброваны на ${report.calibration.texts} текстах.`
         : " Пороги зон не откалиброваны на корпусе: это ориентир, а не приговор — смотрите на сдвиг «до и после», а не на абсолютные значения.");

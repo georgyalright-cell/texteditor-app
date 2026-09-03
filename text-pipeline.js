@@ -81,10 +81,18 @@
         paraphrased = Object.assign({}, paraphrased, { text: chosen.text, selected: chosen.chosen });
       }
     }
-    const humanized = root.HumanizerEngine.humanize(paraphrased.text, { language: paraphrased.language });
-    const typography = root.Typography.normalize(humanized.text);
+    // Типографика идёт ДО цикла, а не после. Она обязана набрать дефис между
+    // словами длинным тире — это правильный набор, — но длинное тире и есть
+    // самый заметный машинный признак, и цикл его штрафует тяжелее прочих.
+    // Пока порядок был обратным, слой набора возвращал тире, которые цикл
+    // только что разобрал, и оценка отыгрывала назад. Теперь цикл видит
+    // финальные знаки и сам решает, какие из них разворачивать в предложение
+    // или в скобки, а какие оставить: тире, которое он оставил, остаётся
+    // осознанным решением, а не следствием порядка вызовов.
+    const typography = root.Typography.normalize(paraphrased.text);
+    const humanized = root.HumanizerEngine.humanize(typography.text, { language: paraphrased.language });
     return {
-      text: typography.text,
+      text: humanized.text,
       language: humanized.language,
       summary: summary(outcome.stats, paraphrased, humanized, typography.stats),
       metricsBefore: root.HumanizerMetrics.scoreText(outcome.text, paraphrased.language),

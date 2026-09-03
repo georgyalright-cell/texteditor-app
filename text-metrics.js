@@ -730,6 +730,28 @@
       },
     ];
 
+    // Зоны измерены на фрагментах от четырёхсот слов. Применять их к тексту
+    // в две фразы — не строгость, а ошибка категории: доля коротких фраз на
+    // двух предложениях скачет от одной правки, и отчёт объявляет ухудшением
+    // то, что им не является. Метрики, описывающие распределение, на коротком
+    // материале честно молчат.
+    const DISTRIBUTION_METRICS = new Set([
+      "sentenceCv",
+      "shortPerParagraph",
+      "paragraphCv",
+      "openerRepeat",
+      "ngramRepeat",
+    ]);
+    const enoughMaterial = wordList.length >= 120 && sentenceList.length >= 5;
+    if (!enoughMaterial) {
+      for (const metric of metrics) {
+        if (DISTRIBUTION_METRICS.has(metric.id) && metric.status !== "unknown") {
+          metric.status = "unknown";
+          metric.note = "текста мало для этой метрики";
+        }
+      }
+    }
+
     const overshoot = detectOvershoot(metrics, {
       shortShare,
       shortShareZone: zones.shortShare,
@@ -752,6 +774,11 @@
       metrics,
       overshoot,
       counts: {
+        // Неизмеримое не считается ни нормой, ни отклонением: иначе короткий
+        // текст выглядит провальным просто потому, что метрикам не хватило
+        // материала.
+        unknown: metrics.filter((metric) => metric.status === "unknown").length,
+        measurable: metrics.filter((metric) => metric.status !== "unknown").length,
         ok: metrics.filter((metric) => metric.status === "ok").length,
         off: metrics.filter((metric) => metric.status === "low" || metric.status === "high").length,
         overshoot: metrics.filter((metric) => metric.status === "overshoot").length,
