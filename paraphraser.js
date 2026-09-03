@@ -356,6 +356,60 @@
     return { text: protectedText.restore(result), replacements: selected.length };
   }
 
+  /**
+   * Все места, где словарь может что-то заменить, со всеми вариантами замены.
+   *
+   * paraphraseText выбирает вариант по хешу и отдаёт одну готовую версию.
+   * Пословному перебору нужно обратное: знать, какие именно места допускают
+   * выбор и какой именно, — чтобы менять по одному месту за шаг и смотреть,
+   * что это даёт. Защищённые участки (ссылки, цитаты, кавычки) исключаются
+   * тем же способом, что и при обычной замене.
+   */
+  function replacementOptions(input, language) {
+    const source = String(input || "");
+    const resolved = language || detectLanguage(source);
+    const rules = RULE_SETS[resolved] || RULE_SETS.en;
+    const protectedText = protectSegments(source);
+    const places = [];
+    let occupiedUntil = -1;
+
+    for (const rule of rules) {
+      const pattern = new RegExp(rule.pattern.source, rule.pattern.flags);
+      for (const match of protectedText.text.matchAll(pattern)) {
+        if (rule.replacements.length < 2) continue;
+        places.push({
+          start: match.index,
+          end: match.index + match[0].length,
+          source: match[0],
+          options: rule.replacements.map((variant) => matchCase(match[0], variant)),
+        });
+      }
+    }
+
+    // Пересекающиеся места не годятся: заменив одно, мы сдвинем границы
+    // другого, и вторая замена встанет не туда.
+    //
+    // Наружу отдаются готовые предложения, а не смещения: смещения посчитаны
+    // в защищённом тексте, где ссылки и цитаты подменены токенами, и резать
+    // по ним исходник нельзя. Вся арифметика остаётся здесь, рядом с защитой.
+    return places
+      .sort((left, right) => left.start - right.start || right.end - left.end)
+      .filter((place) => {
+        if (place.start < occupiedUntil) return false;
+        occupiedUntil = place.end;
+        return true;
+      })
+      .map((place) => ({
+        source: place.source,
+        options: place.options,
+        variants: place.options.map((option) =>
+          protectedText.restore(
+            protectedText.text.slice(0, place.start) + option + protectedText.text.slice(place.end),
+          ),
+        ),
+      }));
+  }
+
   function paraphraseText(input, language, offset) {
     const source = String(input || "");
     const resolved = language || detectLanguage(source);
@@ -403,5 +457,5 @@
     return results;
   }
 
-  return { paraphraseText, paraphraseVariants, detectLanguage, countWords };
+  return { paraphraseText, paraphraseVariants, replacementOptions, detectLanguage, countWords };
 });

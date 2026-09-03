@@ -270,6 +270,15 @@
 
     if (paraphraser) {
       for (const variant of paraphraser.paraphraseVariants(sentence, language, 3)) push(variant.text);
+      // Версии, отличающиеся ровно одной заменой. Это и есть работа на уровне
+      // отдельных оборотов: paraphraseVariants меняет выбор сразу во всех
+      // местах, а здесь каждое место перебирается по одному, и оценка судит
+      // именно эту замену, а не их сочетание.
+      if (typeof paraphraser.replacementOptions === "function") {
+        for (const place of paraphraser.replacementOptions(sentence, language)) {
+          for (const variant of place.variants) push(variant);
+        }
+      }
     }
     if (rewriter) {
       for (const layers of [{ dashes: true }, { antithesis: true }, { dashes: true, antithesis: true }]) {

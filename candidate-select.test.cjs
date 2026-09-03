@@ -265,3 +265,23 @@ test("без модели гибрид не собирается", () => {
   assert.equal(select.hybridScorer("ru", {}), null);
   assert.equal(select.hybridScorer("ru", null), null);
 });
+
+test("в набор кандидатов попадают версии, отличающиеся одной заменой", () => {
+  const sentence = "Кроме того, таким образом, инструмент обрабатывает документы локально и не отправляет данные наружу.";
+  const variants = select.sentenceVariants(sentence, "ru");
+  // Одна замена в первом обороте при нетронутом втором — признак того, что
+  // места перебираются по одному, а не только все сразу.
+  assert.ok(
+    variants.some((item) => /^Помимо этого, таким образом,/u.test(item)),
+    `пословных версий нет: ${variants.join(" | ").slice(0, 200)}`,
+  );
+  assert.ok(variants.some((item) => /^Кроме того, следовательно,/u.test(item)));
+});
+
+test("пословные версии не теряют защищённых участков", () => {
+  const sentence = "Кроме того, таким образом, отчёт лежит по ссылке https://example.com/a?id=27 и содержит 12,5%.";
+  for (const variant of select.sentenceVariants(sentence, "ru")) {
+    assert.match(variant, /https:\/\/example\.com\/a\?id=27/);
+    assert.match(variant, /12,5%/);
+  }
+});
