@@ -487,6 +487,40 @@
     };
   }
 
+  /**
+   * Гибрид: перплексия ранжирует, детерминированная оценка страхует.
+   *
+   * Чистый отбор по перплексии опасен двумя вещами. Первая — цель становится
+   * метрикой конкретной пары моделей 0.5B, а не свойством текста; вторая —
+   * «наименее предсказуемый» вариант нередко и есть самый корявый. Вторую
+   * снимает сам набор кандидатов: в него попадают только версии из словаря,
+   * перестановок и генератора, и каждая уже прошла фактчек-гард, так что
+   * нижняя граница качества задана не оценкой, а генератором вариантов.
+   * Первую снимает эта функция: машинность входит в итог со своим весом и не
+   * даёт выбрать вариант, который выиграл по перплексии, но проиграл по всему
+   * остальному.
+   *
+   * Веса подобраны по порядку величин: машинность 0-100 приводится к единице,
+   * Binoculars живёт около единицы. Это осознанно временное решение —
+   * настраивать их без измерения на корпусе было бы подгонкой вслепую.
+   */
+  function hybridScorer(language, engine) {
+    const perplexity = perplexityScorer(engine);
+    if (!perplexity) return null;
+    const deterministic = deterministicScorer(language);
+    return function score(texts) {
+      return Promise.all([deterministic(texts), perplexity(texts)]).then(([machine, byModel]) =>
+        texts.map((_text, index) => {
+          const model = byModel[index];
+          const own = Number(machine[index]) / 100;
+          // Кандидат, который модель не смогла оценить, не выбывает совсем:
+          // у него остаётся детерминированная часть, просто без прибавки.
+          return Number.isFinite(model) ? own + model : own;
+        }),
+      );
+    };
+  }
+
   /** Оценка модели, если она доступна; иначе детерминированная. */
   function bestAvailableScorer(language, scorer) {
     return perplexityScorer(scorer) || deterministicScorer(language);
@@ -506,6 +540,7 @@
     deepSpotsOf,
     deterministicScorer,
     perplexityScorer,
+    hybridScorer,
     bestAvailableScorer,
     REWRITE_COMBINATIONS,
   };

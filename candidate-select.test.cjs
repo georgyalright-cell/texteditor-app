@@ -242,3 +242,26 @@ test("глубокая редакция распределяет цели по �
   assert.notEqual(result.text, source);
   for (const detail of result.details) assert.ok(detail.novelty >= 0.24);
 });
+
+test("гибридная оценка ранжирует перплексией и страхует машинностью", async () => {
+  const engine = { scoreTexts: (texts) => Promise.resolve(texts.map((_text, index) => (index === 1 ? 1.2 : 0.8))) };
+  const score = select.hybridScorer("ru", engine);
+  const values = await score([
+    "Кроме того, это позволяет повысить эффективность работы отдела продаж.",
+    "Отдел продаж стал работать быстрее.",
+  ]);
+  assert.ok(values[1] < values[0], "вариант с большей перплексией обязан выигрывать");
+});
+
+test("неоценённый моделью кандидат сохраняет детерминированную часть", async () => {
+  const engine = { scoreTexts: (texts) => Promise.resolve(texts.map(() => Number.NaN)) };
+  const score = select.hybridScorer("ru", engine);
+  const values = await score(["Кроме того, таким образом, важно отметить, что это важно.", "Выручка выросла на 12%."]);
+  assert.ok(values.every((value) => Number.isFinite(value)), "оценка не должна становиться NaN целиком");
+  assert.ok(values[1] < values[0], "при недоступной модели решает машинность");
+});
+
+test("без модели гибрид не собирается", () => {
+  assert.equal(select.hybridScorer("ru", {}), null);
+  assert.equal(select.hybridScorer("ru", null), null);
+});

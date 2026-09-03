@@ -482,13 +482,22 @@
     nodes.editsGuard.textContent =
       "Модель распределённо перестраивает формулировки. Числа, ссылки, имена, язык и объём остаются под защитой.";
 
+    // Ранжировать перплексией имеет смысл только там, где модель есть. Одна
+    // оценка — два прохода модели, поэтому при включённом ранжировании число
+    // предложений за прогон урезается: двенадцать предложений со всеми их
+    // версиями — это сотни проходов, то есть минуты вместо секунд.
+    const ranker = selector.hybridScorer ? selector.hybridScorer(state.report.language, root.NeuralScorerUI) : null;
+    // Два бюджета, а не один: с ранжированием моделью каждая версия стоит двух
+    // проходов, и двенадцать предложений превращают секунды в минуты.
+    const budget = ranker ? { share: 0.15, limit: 5 } : { share: 0.35, limit: 12 };
     selector
       .polishSentences(state.workingText, {
         language: state.report.language,
         generate,
         preferFresh: true,
-        share: 0.35,
-        limit: 12,
+        share: budget.share,
+        limit: budget.limit,
+        score: ranker || undefined,
       })
       .then((result) => {
         if (operation !== state.operation) return;
