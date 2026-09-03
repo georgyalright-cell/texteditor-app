@@ -94,6 +94,7 @@
   }
 
   const pending = new Map();
+  let modelsWarm = false;
   let selectionId = 1000000;
 
   function ensureWorker() {
@@ -106,6 +107,7 @@
         return;
       }
       if (message.type === "ready") {
+        modelsWarm = true;
         setStatus(message.message, false);
         return;
       }
@@ -115,7 +117,10 @@
         const waiting = pending.get(message.id);
         pending.delete(message.id);
         elements.progress.hidden = true;
-        if (message.type === "scores") waiting.resolve(message.scores || []);
+        if (message.type === "scores") {
+          modelsWarm = true;
+          waiting.resolve(message.scores || []);
+        }
         else if (message.type === "error") waiting.reject(new Error(message.message || "Оценка не выполнена."));
         return;
       }
@@ -126,7 +131,10 @@
         setBusy(false);
         return;
       }
-      if (message.type === "result") renderResult(message);
+      if (message.type === "result") {
+        modelsWarm = true;
+        renderResult(message);
+      }
       if (message.type === "error") setStatus(`Нейрооценка не выполнена: ${message.message}`, true);
       if (message.type === "result" || message.type === "error") setBusy(false);
     });
@@ -190,6 +198,9 @@
     setTexts,
     supported,
     scoreTexts,
+    // Загружены ли модели. Ранжирование перплексией опирается на это: само
+    // оно загрузку не начинает.
+    warm: () => modelsWarm,
     reportProgress,
     lockForPolish,
     unlockAfterPolish,

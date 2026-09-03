@@ -486,7 +486,12 @@
     // оценка — два прохода модели, поэтому при включённом ранжировании число
     // предложений за прогон урезается: двенадцать предложений со всеми их
     // версиями — это сотни проходов, то есть минуты вместо секунд.
-    const ranker = selector.hybridScorer ? selector.hybridScorer(state.report.language, root.NeuralScorerUI) : null;
+    // Ранжирование подключается только к уже загруженным моделям. Тянуть
+    // гигабайт весов по нажатию кнопки, которая до сих пор отрабатывала за
+    // секунду и без сети, — не улучшение, а неожиданность.
+    const engine = root.NeuralScorerUI;
+    const warm = Boolean(engine && typeof engine.warm === "function" && engine.warm());
+    const ranker = warm && selector.hybridScorer ? selector.hybridScorer(state.report.language, engine) : null;
     // Два бюджета, а не один: с ранжированием моделью каждая версия стоит двух
     // проходов, и двенадцать предложений превращают секунды в минуты.
     const budget = ranker ? { share: 0.15, limit: 5 } : { share: 0.35, limit: 12 };
