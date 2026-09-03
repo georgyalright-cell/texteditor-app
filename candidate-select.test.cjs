@@ -256,7 +256,10 @@ test("гибридная оценка ранжирует перплексией 
 test("неоценённый моделью кандидат сохраняет детерминированную часть", async () => {
   const engine = { scoreTexts: (texts) => Promise.resolve(texts.map(() => Number.NaN)) };
   const score = select.hybridScorer("ru", engine);
-  const values = await score(["Кроме того, таким образом, важно отметить, что это важно.", "Выручка выросла на 12%."]);
+  const values = await score([
+    "В современном мире это играет ключевую роль и является неотъемлемой частью широкого спектра задач.",
+    "Выручка выросла на 12% за квартал.",
+  ]);
   assert.ok(values.every((value) => Number.isFinite(value)), "оценка не должна становиться NaN целиком");
   assert.ok(values[1] < values[0], "при недоступной модели решает машинность");
 });
