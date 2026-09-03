@@ -106,3 +106,14 @@ test("воркер использует локальный рантайм и з�
   assert.match(workerSource, /resolve\/\$\{GENERATOR_REVISION\}/);
   assert.doesNotMatch(workerSource, /from\s+["']https?:/u);
 });
+
+test("глубокая редакция добавляет только контролируемую вариативность", () => {
+  const workerSource = fs.readFileSync(require.resolve("./generator-worker.js"), "utf8");
+  const generatorSource = fs.readFileSync(require.resolve("./generator.js"), "utf8");
+  assert.match(workerSource, /crypto\.getRandomValues/u);
+  assert.match(workerSource, /SAMPLING_TEMPERATURE = 0\.68/u);
+  assert.match(workerSource, /SAMPLING_TOP_P = 0\.92/u);
+  assert.match(workerSource, /seed: samplingSeed\(request\.id\)/u);
+  assert.doesNotMatch(workerSource, /seed:\s*20260903/u);
+  assert.match(generatorSource, /generator-worker\.js\?v=34/u);
+});

@@ -12,6 +12,8 @@ const MODEL_LIBRARY = new URL(
   self.location.href,
 ).href;
 const MAX_NEW_TOKENS = 160;
+const SAMPLING_TEMPERATURE = 0.68;
+const SAMPLING_TOP_P = 0.92;
 
 const APP_CONFIG = {
   model_list: [{
@@ -31,6 +33,18 @@ let queue = Promise.resolve();
 
 function send(type, detail) {
   self.postMessage({ type, ...detail });
+}
+
+/**
+ * Повторный запуск не обязан возвращать тот же вариант. Seed меняет только
+ * генеративные предложения: итог по-прежнему выбирают детерминированные гарды.
+ */
+function samplingSeed(requestId) {
+  const fallback = (Date.now() + (Number(requestId) || 0)) % 2147483647;
+  if (!self.crypto || typeof self.crypto.getRandomValues !== "function") return fallback;
+  const value = new Uint32Array(1);
+  self.crypto.getRandomValues(value);
+  return value[0] % 2147483647;
 }
 
 function progressReporter(report) {
@@ -92,10 +106,10 @@ async function paraphrase(request) {
       model: GENERATOR_MODEL,
       n: count,
       max_tokens: MAX_NEW_TOKENS,
-      temperature: 0.62,
-      top_p: 0.9,
+      temperature: SAMPLING_TEMPERATURE,
+      top_p: SAMPLING_TOP_P,
       repetition_penalty: 1.08,
-      seed: 20260903 + (Number(request.id) || 0),
+      seed: samplingSeed(request.id),
     });
     const raw = Array.isArray(response && response.choices)
       ? response.choices.map((choice) => choice && choice.message && choice.message.content)
