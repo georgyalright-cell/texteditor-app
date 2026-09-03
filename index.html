@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' https://huggingface.co https://*.huggingface.co https://*.hf.co; img-src 'self' data: blob:; style-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <title>TextEditor — обработка и сборка работ</title>
+    <link rel="stylesheet" href="styles.css?v=17" />
+    <link rel="stylesheet" href="workspace.css?v=17" />
+    <link rel="stylesheet" href="review.css?v=17" />
+    <link rel="stylesheet" href="neural-scorer.css?v=17" />
+    <link rel="stylesheet" href="help.css?v=17" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="page-shell">
+        <div class="brand-copy">
+          <a class="wordmark" href="#editor" aria-label="TextEditor — к редактору">TextEditor</a>
+          <p class="tagline">Чистый текст, понятная структура и цельный DOCX — локально в браузере</p>
+        </div>
+        <button class="help-trigger" id="helpButton" type="button" aria-haspopup="dialog" aria-controls="helpDialog">
+          <span class="help-trigger-icon" aria-hidden="true">?</span>
+          <span>Как пользоваться</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="page-shell page-main">
+      <section class="editor" id="editor" aria-label="Обработка текста">
+        <div class="mode-switch" role="tablist" aria-label="Режим работы">
+          <button class="mode-option is-active" id="fragmentModeButton" type="button" role="tab" aria-selected="true" aria-controls="fragmentWorkspace" data-mode="fragment">
+            <span class="mode-kicker">Режим 1</span>
+            <strong>Обработать текст</strong>
+            <small>Один фрагмент без сборки всей работы</small>
+          </button>
+          <button class="mode-option" id="projectModeButton" type="button" role="tab" aria-selected="false" aria-controls="projectWorkspace" data-mode="project">
+            <span class="mode-kicker">Режим 2</span>
+            <strong>Собрать полноценную работу</strong>
+            <small>Копите части и формируйте единый DOCX</small>
+          </button>
+        </div>
+
+        <div class="profile-bar" id="profileBar" hidden>
+          <label class="profile-label" for="profileSelect">Формат</label>
+          <select class="profile-select" id="profileSelect"></select>
+          <p class="profile-description" id="profileDescription"></p>
+        </div>
+
+        <section class="project-workspace" id="projectWorkspace" aria-labelledby="projectWorkspaceTitle" hidden>
+          <div class="project-intro">
+            <div>
+              <p class="eyebrow">Локальный проект</p>
+              <h1 id="projectWorkspaceTitle">Что требуется для цельного документа</h1>
+              <p>
+                Добавляйте материалы частями. Инструмент ничего не придумывает: он хранит предоставленные данные,
+                распределяет их по структуре, показывает пробелы и собирает проверяемый черновик.
+              </p>
+            </div>
+            <div class="readiness-badge" id="readinessBadge" aria-live="polite">Проект не заполнен</div>
+          </div>
+
+          <ol class="project-instructions">
+            <li><strong>Заполните паспорт.</strong> Тема, цель, объект, границы, методы, авторы и год.</li>
+            <li><strong>Добавьте содержание.</strong> Выбирайте раздел для каждого обработанного фрагмента.</li>
+            <li><strong>Приложите доказательства.</strong> Источники, ссылки и расчёты добавляйте частями. Таблицу можно скопировать из Excel: строки и ячейки распознаются автоматически.</li>
+            <li><strong>Проверьте готовность.</strong> Зелёный статус означает, что обязательные поля и разделы присутствуют.</li>
+          </ol>
+
+          <div class="readiness-panel">
+            <div class="readiness-heading">
+              <h2>Готовность проекта</h2>
+              <div class="readiness-actions">
+                <button class="text-button" id="nextMissingButton" type="button" hidden>Заполнить следующий пункт</button>
+                <span id="readinessCount">0 из 0</span>
+              </div>
+            </div>
+            <div class="readiness-list" id="readinessList"></div>
+          </div>
+        </section>
+
+        <details class="metadata" id="metadata" open hidden>
+          <summary>Паспорт работы</summary>
+          <p class="metadata-hint">
+            Эти сведения нужны для титульного листа, проверки полноты и контекста работы. Они сохраняются только в этом браузере.
+          </p>
+          <div class="metadata-body">
+            <label class="field">
+              <span>Тема проекта, компания</span>
+              <input type="text" id="metaTopic" placeholder="Локализация производства…" />
+            </label>
+            <label class="field">
+              <span>Образовательная программа</span>
+              <select id="metaProgramme">
+                <option value="">Business Management / Business Informatics</option>
+                <option value="Business Management">Business Management</option>
+                <option value="Business Informatics">Business Informatics</option>
+              </select>
+            </label>
+            <label class="field field-wide">
+              <span>Цель работы</span>
+              <textarea id="metaGoal" rows="2" placeholder="Оценить целесообразность запуска проекта и обосновать решение"></textarea>
+            </label>
+            <label class="field">
+              <span>Объект исследования, компания или проект</span>
+              <input type="text" id="metaObject" placeholder="Компания, продукт, рынок или процесс" />
+            </label>
+            <label class="field">
+              <span>География, период и границы анализа</span>
+              <input type="text" id="metaScope" placeholder="Россия, 2026–2030 годы" />
+            </label>
+            <label class="field field-wide">
+              <span>Методы, исходные данные и база доказательств</span>
+              <textarea id="metaMethods" rows="3" placeholder="Анализ рынка, интервью, финансовая модель, статистика и перечень исходных данных"></textarea>
+            </label>
+            <label class="field field-wide">
+              <span>Команда — по одному участнику в строке, «Фамилия И.О., группа»</span>
+              <textarea id="metaTeam" rows="4" placeholder="Ермошин А. А., БМ-201"></textarea>
+            </label>
+            <label class="field">
+              <span>Научный руководитель</span>
+              <input type="text" id="metaSupervisor" placeholder="к.э.н., доцент, Петров П. П." />
+            </label>
+            <label class="field">
+              <span>Год</span>
+              <input type="text" id="metaYear" inputmode="numeric" placeholder="2026" />
+            </label>
+          </div>
+        </details>
+
+        <div class="editor-grid" id="fragmentWorkspace">
+          <section class="editor-panel input-panel" aria-labelledby="source-title">
+            <div class="panel-heading">
+              <h1 id="source-title">Текст для обработки</h1>
+            </div>
+
+            <div class="part-fields" id="partFields" hidden>
+              <label class="compact-field">
+                <span>Раздел работы</span>
+                <select id="partSection"></select>
+              </label>
+              <label class="compact-field">
+                <span>Название части — необязательно</span>
+                <input type="text" id="partTitle" placeholder="Например, анализ конкурентов" />
+              </label>
+            </div>
+
+            <div class="source-field" id="dropZone">
+              <textarea
+                id="sourceText"
+                spellcheck="true"
+                placeholder="Вставьте сырой текст или перетащите файл"
+                aria-describedby="fileSupport sourceStatus"
+              ></textarea>
+              <span class="counter source-counter" id="sourceCount">0 символов</span>
+            </div>
+
+            <div class="file-row">
+              <label class="file-button" for="fileInput">Выбрать файл</label>
+              <input
+                id="fileInput"
+                class="visually-hidden"
+                type="file"
+                accept=".txt,.md,.markdown,.rst,.pdf,.docx,.rtf,.odt,.epub,.pptx,.xlsx,.xlsm,.csv,.tsv,.json,.html,.htm,.xml,.fb2,.srt,.vtt"
+              />
+              <p class="file-support" id="fileSupport">TXT, PDF, DOCX, RTF, ODT, EPUB, PPTX, XLSX и другие — до 20 МБ</p>
+            </div>
+            <p class="status" id="sourceStatus" role="status" aria-live="polite"></p>
+          </section>
+
+          <section class="editor-panel output-panel" aria-labelledby="result-title">
+            <div class="panel-heading">
+              <h2 id="result-title">Обработанный текст</h2>
+              <div class="result-meta">
+                <span class="result-state" id="resultState" hidden>Готово</span>
+                <span class="counter" id="resultCount">0 символов</span>
+              </div>
+            </div>
+            <div class="result-field is-empty" id="resultText" tabindex="0" aria-live="polite">
+              <span class="empty-state">Здесь появится собранный документ</span>
+            </div>
+            <p class="result-note" id="resultNote" aria-live="polite"></p>
+          </section>
+        </div>
+
+        <div class="assembly-summary" id="assemblySummary" hidden></div>
+
+        <div class="action-rail">
+          <button class="button button-primary" id="processButton" type="button" disabled>
+            Обработать текст
+          </button>
+          <button class="button button-accent" id="addPartButton" type="button" disabled hidden>
+            Добавить часть в работу
+          </button>
+          <button class="button button-primary" id="assembleProjectButton" type="button" disabled hidden>
+            Собрать весь документ
+          </button>
+          <button class="button button-accent download-button" id="downloadDocxButton" type="button" disabled>
+            Скачать DOCX
+          </button>
+          <button class="button button-secondary download-button" id="downloadButton" type="button" disabled>
+            Скачать TXT
+          </button>
+          <button class="button button-secondary" id="clearButton" type="button" disabled>
+            Очистить
+          </button>
+        </div>
+
+        <section class="parts-library" id="partsLibrary" hidden aria-labelledby="partsTitle">
+          <div class="parts-heading">
+            <div>
+              <p class="eyebrow">Материалы проекта</p>
+              <h2 id="partsTitle">Добавленные части</h2>
+            </div>
+            <button class="text-button danger-button" id="resetProjectButton" type="button">Очистить проект</button>
+          </div>
+          <div class="parts-list" id="partsList"></div>
+        </section>
+      </section>
+
+      <section class="metrics" id="metrics" hidden aria-labelledby="metrics-title">
+        <h2 class="metrics-title" id="metrics-title">Стилистические признаки текста</h2>
+        <div class="metrics-grid" id="metricsGrid"></div>
+        <p class="metrics-note" id="metricsNote"></p>
+      </section>
+
+      <section class="review" id="review" hidden aria-labelledby="review-title">
+        <div class="review-head">
+          <h2 class="review-title" id="review-title">Отчёт о тексте</h2>
+          <div class="review-genre">
+            <label for="genreSelect">Жанр и целевые зоны</label>
+            <select id="genreSelect"></select>
+          </div>
+        </div>
+        <p class="review-summary" id="reviewSummary"></p>
+        <p class="review-baseline" id="reviewBaseline" hidden></p>
+        <div class="report-grid" id="reportGrid"></div>
+        <div class="review-alert" id="reportOvershoot" hidden></div>
+
+        <details class="review-block" open>
+          <summary>Правки — принимаются поштучно <span class="review-badge" id="editsCount"></span></summary>
+          <div class="review-block-body">
+            <div class="edits-toolbar">
+              <button class="button button-secondary" id="acceptSafeButton" type="button">Принять безопасные</button>
+              <button class="button button-secondary" id="clearEditsButton" type="button">Снять все</button>
+              <button class="button button-secondary" id="saveRevisionButton" type="button">Сохранить версию</button>
+              <button class="button button-secondary" id="polishButton" type="button">Отобрать формулировки моделью</button>
+            </div>
+            <p class="edits-guard" id="editsGuard" aria-live="polite"></p>
+            <ul class="edit-list" id="editList"></ul>
+            <div id="manualList"></div>
+          </div>
+        </details>
+
+        <details class="review-block">
+          <summary>Слабые места — что править рукой <span class="review-badge" id="weakCount"></span></summary>
+          <div class="review-block-body">
+            <p class="review-note" id="weakNote"></p>
+            <ol class="weak-list" id="weakList"></ol>
+          </div>
+        </details>
+
+        <details class="review-block">
+          <summary>Чего не хватает — вопросы автору <span class="review-badge" id="askCount"></span></summary>
+          <div class="review-block-body">
+            <div id="questionList"></div>
+            <div id="checklistBox"></div>
+            <div id="terminologyBox"></div>
+          </div>
+        </details>
+
+        <details class="review-block">
+          <summary>История версий</summary>
+          <div class="review-block-body">
+            <div id="historyList"></div>
+          </div>
+        </details>
+      </section>
+
+      <section class="neural-assistant" id="neuralAssistant" hidden aria-labelledby="neural-title">
+        <div class="neural-heading">
+          <div>
+            <h2 id="neural-title">Локальная нейрооценка</h2>
+            <p>
+              Две небольшие языковые модели сравнят исходник и результат по реальной перплексии и Binoculars.
+              Отдельная инструктивная модель создаёт варианты для кнопки отбора формулировок.
+              Текст остаётся на устройстве; сервер и ключи не нужны.
+            </p>
+          </div>
+          <button class="button button-secondary neural-action" id="neuralScoreButton" type="button">Загрузить и оценить</button>
+        </div>
+        <progress class="neural-progress" id="neuralProgress" max="100" hidden></progress>
+        <p class="neural-status" id="neuralStatus" role="status" aria-live="polite"></p>
+        <div class="neural-results" id="neuralResults" hidden></div>
+        <p class="neural-result-note" id="neuralResultNote"></p>
+      </section>
+
+      <section class="compliance" id="compliance" hidden aria-labelledby="compliance-title">
+        <h2 class="compliance-title" id="compliance-title">Соответствие требованиям</h2>
+        <div class="compliance-body" id="complianceBody"></div>
+      </section>
+
+      <details class="explanation">
+        <summary>Что делает инструмент</summary>
+        <div class="explanation-body">
+          <ul>
+            <li>чистит артефакты <code>n n</code>, <code>\rn</code>, лишние пробелы, повторы предложений и абзацев;</li>
+            <li>по замкнутому циклу исправляет безопасными правилами шаблонные обороты, тире-коннекторы и слишком ровный ритм, откатывая правку при потере чисел или ссылок;</li>
+            <li>считает 11 дополнительных показателей, показывает каждую композиционную правку и позволяет точно её отменить;</li>
+            <li>набирает типографику — кавычки, тире, диапазоны, неразрывные пробелы;</li>
+            <li>раскладывает текст по разделам методички и достраивает недостающие: подразделы, шаблонные таблицы, титульный лист, оглавление, личный вклад;</li>
+            <li>собирает <code>.docx</code> с полями 2/2/3/1.5 см, Times New Roman 12 pt, интервалом 1.15 и нумерацией страниц.</li>
+          </ul>
+          <p>Содержание разделов не сочиняется. В режиме сборки инструмент объединяет только предоставленные материалы и явно отмечает всё, чего не хватает.</p>
+          <p>Нейрооценка включается отдельно и загружает около 1 ГБ. Генератор формулировок загружается только по своей кнопке и добавляет около 500 МБ. Браузер обычно сохраняет модели в кэше, но может удалить их при очистке данных или нехватке места.</p>
+        </div>
+      </details>
+    </main>
+
+    <dialog class="help-dialog" id="helpDialog" aria-labelledby="helpDialogTitle">
+      <div class="help-dialog-head">
+        <div>
+          <p class="help-dialog-kicker">Короткая инструкция</p>
+          <h2 id="helpDialogTitle">Как пользоваться TextEditor</h2>
+        </div>
+        <form method="dialog">
+          <button class="help-close" type="submit" aria-label="Закрыть инструкцию">×</button>
+        </form>
+      </div>
+
+      <p class="help-dialog-intro">Сначала выберите режим в верхней части редактора — дальнейшие шаги зависят от задачи.</p>
+
+      <div class="help-mode-grid">
+        <section class="help-mode" aria-labelledby="helpFragmentTitle">
+          <p class="help-mode-number">Режим 1</p>
+          <h3 id="helpFragmentTitle">Обработать один текст</h3>
+          <ol>
+            <li>Вставьте черновик или выберите файл.</li>
+            <li>Нажмите «Обработать текст».</li>
+            <li>Просмотрите результат и отчёт; при необходимости примите предложенные правки.</li>
+            <li>Скачайте итог в DOCX или TXT.</li>
+          </ol>
+        </section>
+
+        <section class="help-mode" aria-labelledby="helpProjectTitle">
+          <p class="help-mode-number">Режим 2</p>
+          <h3 id="helpProjectTitle">Собрать полноценную работу</h3>
+          <ol>
+            <li>Заполните паспорт работы.</li>
+            <li>Выберите раздел, вставьте материал и обработайте его.</li>
+            <li>Нажмите «Добавить часть в работу» и повторите для остальных разделов.</li>
+            <li>Закройте пункты готовности, соберите документ и скачайте DOCX.</li>
+          </ol>
+        </section>
+      </div>
+
+      <div class="help-tip">
+        <strong>Как добавить таблицу</strong>
+        <p>Скопируйте диапазон из Excel или Google Sheets прямо в поле текста: первая строка станет заголовком, табуляции разделят ячейки, переносы — строки.</p>
+      </div>
+
+      <p class="help-local-note">
+        Инструмент не придумывает отсутствующие факты. Проект хранится только в этом браузере, поэтому готовый документ лучше скачать до очистки его данных.
+      </p>
+    </dialog>
+
+    <script src="vendor/mammoth/mammoth.browser.min.js?v=18" defer></script>
+    <script src="vendor/jszip/jszip.min.js?v=18" defer></script>
+    <script src="vendor/sheetjs/xlsx.full.min.js?v=18" defer></script>
+    <script src="format-profiles.js?v=18" defer></script>
+    <script src="typography.js?v=18" defer></script>
+    <script src="humanizer-metrics.js?v=18" defer></script>
+    <script src="anchor-guard.js?v=18" defer></script>
+    <script src="text-metrics.js?v=18" defer></script>
+    <script src="edit-passes.js?v=18" defer></script>
+    <script src="elicitation.js?v=18" defer></script>
+    <script src="revision-store.js?v=18" defer></script>
+    <script src="processor.js?v=18" defer></script>
+    <script src="paraphraser.js?v=18" defer></script>
+    <script src="rewriter.js?v=18" defer></script>
+    <script src="candidate-select.js?v=18" defer></script>
+    <script src="weak-spots.js?v=18" defer></script>
+    <script src="usage-baseline.js?v=18" defer></script>
+    <script src="humanizer-engine.js?v=18" defer></script>
+    <script src="text-pipeline.js?v=18" defer></script>
+    <script src="structurer.js?v=18" defer></script>
+    <script src="document-builder.js?v=18" defer></script>
+    <script src="docx-writer.js?v=18" defer></script>
+    <script src="document-reader.js?v=18" defer></script>
+    <script src="work-project.js?v=18" defer></script>
+    <script src="project-view.js?v=18" defer></script>
+    <script src="neural-scorer.js?v=18" defer></script>
+    <script src="generator-core.js?v=18" defer></script>
+    <script src="generator.js?v=18" defer></script>
+    <script src="review-ui.js?v=18" defer></script>
+    <script src="help-dialog.js?v=18" defer></script>
+    <script src="app.js?v=18" defer></script>
+  </body>
+</html>

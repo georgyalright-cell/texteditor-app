@@ -1,0 +1,23 @@
+name: Check TextEditor availability
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the page and critical assets
+        env:
+          SITE_URL: https://georgyalright-cell.github.io/texteditor-app
+        run: |
+          set -euo pipefail
+          page="$(curl --fail --silent --show-error --location --retry 3 --retry-all-errors --max-time 30 "$SITE_URL/")"
+          grep -Fq '<title>TextEditor' <<< "$page"
+          curl --fail --silent --show-error --location --retry 3 --retry-all-errors --max-time 30 --output /dev/null "$SITE_URL/review-ui.js"
+          curl --fail --silent --show-error --location --retry 3 --retry-all-errors --max-time 30 --output /dev/null "$SITE_URL/generator-worker.js"
