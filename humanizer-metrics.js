@@ -130,12 +130,20 @@
     return (text.replace(NUMERIC_RANGE_RE, "") .match(EM_DASH_RE) || []).length;
   }
 
-  function emDashScore(text, sentenceCount) {
+  // Норма тире измерена, а не назначена: девятый дециль по корпусам живых
+  // текстов. Единое «одно на пять предложений» было неверно в обе стороны.
+  // В русском тире — штатный знак (нулевая связка: «Х — это Y»), и живая
+  // проза даёт до 0.30 на предложение; прежний порог 0.20 штрафовал четверть
+  // корпуса, причём сразу на 100. В английской деловой прозе тире почти не
+  // встречается (медиана 0.00), и тот же порог 0.20 недоштрафовывал машинный
+  // текст втрое.
+  const DASH_ALLOWANCE = { ru: 0.3, en: 0.08 };
+
+  function emDashScore(text, sentenceCount, locale) {
     const dashes = connectorDashes(text);
     if (dashes === 0) return 0;
-    // ~1 тире на 5 предложений — грамматически обязательные случаи;
-    // штрафуется только избыток сверх этой нормы.
-    const allowance = Math.max(1, Math.round(sentenceCount / 5));
+    const rate = DASH_ALLOWANCE[locale] || DASH_ALLOWANCE.en;
+    const allowance = Math.max(1, Math.round(sentenceCount * rate));
     const excess = dashes - allowance;
     if (excess <= 0) return 0;
     return Math.min(100, excess * 50);
@@ -164,12 +172,21 @@
     return Math.min(100, hits * 20);
   }
 
+  // Сколько антитез живой текст позволяет себе бесплатно. В русском «не
+  // только X, но и Y» — обычная конструкция: она есть у 28% фрагментов
+  // корпуса. Прежнее правило выставляло за одну встречу сразу 45, то есть
+  // объявляло каждый четвёртый живой текст предельно машинным. В английской
+  // деловой прозе конструкция редка (4% текстов), и там бесплатных нет.
+  const ANTITHESIS_FREE = { ru: 1, en: 0 };
+
   function antithesisScore(text, set) {
     const strong = (text.match(set.strong) || []).length;
     const weak = (text.match(set.weak) || []).length;
+    const free = ANTITHESIS_FREE[set.locale] === undefined ? 0 : ANTITHESIS_FREE[set.locale];
+    const strongPenalty = Math.max(0, strong - free);
     // Первое вхождение слабой формы — обычная грамматика, не в счёт.
     const weakPenalty = Math.max(0, weak - 1);
-    return Math.min(100, strong * 45 + weakPenalty * 30);
+    return Math.min(100, strongPenalty * 45 + weakPenalty * 30);
   }
 
   // Свободная норма у каждого признака своя: связка в каждом седьмом
@@ -252,7 +269,7 @@
     const resolved = language || detectLanguage(source);
     const set = SETS[resolved] || SETS.en;
     const sentenceList = sentences(source);
-    const emDash = emDashScore(source, sentenceList.length);
+    const emDash = emDashScore(source, sentenceList.length, set.locale);
     const burstiness = burstinessScore(sentenceList);
     const cliche = clicheScore(source.toLocaleLowerCase(set.locale), set.cliche);
     const antithesis = antithesisScore(source, set);

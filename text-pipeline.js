@@ -111,12 +111,28 @@
       language: paraphrased.language,
       loose,
     });
+    // Сторож на выходе. Замкнутый цикл не принимает шаг, поднимающий оценку,
+    // но слои до него — словарь, отбор вариантов, типографика — оценкой не
+    // проверяются вовсе. На живых текстах это давало то, чего быть не должно:
+    // инструмент возвращал текст ХУЖЕ присланного. Здесь итог сравнивается с
+    // вычищенным исходником, и если правки в сумме навредили, возвращается он.
+    // Сравнение идёт с текстом ДО словаря: именно словарная замена может
+    // поднять оценку, и если сравнивать с уже перефразированным вариантом,
+    // её вред войдёт в базу сравнения и останется незамеченным.
+    const cleanedScore = root.HumanizerMetrics.scoreText(outcome.text, paraphrased.language).score;
+    const finalScore = root.HumanizerMetrics.scoreText(humanized.text, paraphrased.language).score;
+    const regressed = finalScore > cleanedScore;
+    const finalText = regressed ? outcome.text : humanized.text;
+    const guardWarnings = regressed
+      ? ["Правки в сумме подняли оценку машинности, поэтому оставлен вычищенный исходник."]
+      : [];
+
     return {
-      text: humanized.text,
+      text: finalText,
       language: humanized.language,
       summary: summary(outcome.stats, paraphrased, humanized, typography.stats),
       metricsBefore: root.HumanizerMetrics.scoreText(outcome.text, paraphrased.language),
-      warnings: [...outcome.warnings, ...paraphrased.warnings, ...humanized.warnings],
+      warnings: [...outcome.warnings, ...paraphrased.warnings, ...humanized.warnings, ...guardWarnings],
     };
   }
 

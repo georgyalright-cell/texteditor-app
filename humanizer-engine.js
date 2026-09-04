@@ -18,7 +18,18 @@
   const NUMBER_RE = /\d+(?:[.,]\d+)?/gu;
   const URL_RE = /https?:\/\/[^\s<>()]+/giu;
 
-  const DEFAULT_TARGET = 12;
+  // Цель — не ноль, а медиана живого текста по этой же оценке. Ноль означал
+  // бы «чище, чем пишут люди», что само по себе примета. Числа измерены на
+  // тех же корпусах, что и зоны отчёта: 123 фрагмента русских экономических
+  // статей и 54 раздела MD&A.
+  //
+  // Прежняя плоская двенадцатка была мягкой для обоих языков: цикл
+  // останавливался, не дойдя до типичной человеческой прозы.
+  const DEFAULT_TARGET = { ru: 4, en: 7 };
+
+  function targetFor(language) {
+    return DEFAULT_TARGET[language] === undefined ? DEFAULT_TARGET.en : DEFAULT_TARGET[language];
+  }
   const DEFAULT_MAX_ROUNDS = 12;
   // Каждая трансформация может отработать дважды: слой ритма меняет число
   // предложений, а от него зависит норма по тире, поэтому второй проход по
@@ -206,7 +217,7 @@
     if (missing.length) throw new Error(`HumanizerEngine: не загружены модули ${missing.join(", ")}`);
 
     const language = settings.language || deps.metrics.detectLanguage(source);
-    const target = typeof settings.target === "number" ? settings.target : DEFAULT_TARGET;
+    const target = typeof settings.target === "number" ? settings.target : targetFor(language);
     const maxRounds = typeof settings.maxRounds === "number" ? settings.maxRounds : DEFAULT_MAX_ROUNDS;
 
     const before = deps.metrics.scoreText(source, language);
@@ -310,5 +321,5 @@
       `${accepted.length === 1 ? "раунд" : accepted.length < 5 ? "раунда" : "раундов"} (${steps.join("; ")}).`;
   }
 
-  return { humanize, describeRounds, integrityIssues, DEFAULT_TARGET, ACTION_LABELS };
+  return { humanize, describeRounds, integrityIssues, targetFor, DEFAULT_TARGET, ACTION_LABELS };
 });
