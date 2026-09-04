@@ -53,6 +53,22 @@
     return parts;
   }
 
+  // Свободный режим включается по бедности текста фактами, а не по желанию.
+  //
+  // Небрежность уместна там, где автор рассуждает, и неуместна там, где он
+  // приводит числа: в плотном отчёте «Но» вместо «Однако» выглядит
+  // разболтанностью, а в тексте из одних общих слов — живой речью. Порог тот
+  // же, что у нижней границы зоны A1: три якоря на сто слов.
+  const LOOSE_ANCHOR_LIMIT = 3;
+
+  function looseNeeded(text) {
+    const guard = root.AnchorGuard;
+    if (!guard) return false;
+    const words = root.TextProcessor.countWords(text);
+    if (!words) return false;
+    return (guard.extractAnchors(text).length * 100) / words < LOOSE_ANCHOR_LIMIT;
+  }
+
   function run(text) {
     const required = [
       root.TextProcessor,
@@ -90,7 +106,11 @@
     // или в скобки, а какие оставить: тире, которое он оставил, остаётся
     // осознанным решением, а не следствием порядка вызовов.
     const typography = root.Typography.normalize(paraphrased.text);
-    const humanized = root.HumanizerEngine.humanize(typography.text, { language: paraphrased.language });
+    const loose = looseNeeded(typography.text);
+    const humanized = root.HumanizerEngine.humanize(typography.text, {
+      language: paraphrased.language,
+      loose,
+    });
     return {
       text: humanized.text,
       language: humanized.language,

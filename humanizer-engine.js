@@ -83,6 +83,7 @@
       paraphraser: pick("paraphraser", scope.RuleParaphraser),
       rewriter: pick("rewriter", scope.StructuralRewriter),
       passes: pick("passes", scope.EditPasses || loadPasses()),
+      loose: given.loose === true,
     };
   }
 
@@ -190,7 +191,7 @@
       const outcome = deps.paraphraser.paraphraseText(text, language);
       return { text: outcome.text, changed: outcome.replacements > 0, warnings: outcome.warnings || [] };
     }
-    const options = { language, dashes: false, antithesis: false, rhythm: false, openers: false };
+    const options = { language, dashes: false, antithesis: false, rhythm: false, openers: false, loose: deps.loose === true };
     options[id === "dash" ? "dashes" : id] = true;
     const outcome = deps.rewriter.rewrite(text, options);
     const changed = Object.keys(outcome.actions).some((key) => outcome.actions[key] > 0);
@@ -199,7 +200,7 @@
 
   function humanize(input, options) {
     const settings = options || {};
-    const deps = modules(settings.modules);
+    const deps = modules(Object.assign({ loose: settings.loose === true }, settings.modules));
     const source = String(input || "");
     const missing = ["metrics", "paraphraser", "rewriter"].filter((name) => !deps[name]);
     if (missing.length) throw new Error(`HumanizerEngine: не загружены модули ${missing.join(", ")}`);

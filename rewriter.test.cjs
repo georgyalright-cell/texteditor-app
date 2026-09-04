@@ -203,3 +203,34 @@ test("список не переразбивается", () => {
   const source = [list, list, list].join("\n\n");
   assert.equal(rewriter.reflowParagraphs(source).created, 0);
 });
+
+test("свободный режим понижает книжную связку до простого союза", () => {
+  const source = "Рынок вырос. Однако маржинальность осталась низкой. Тем не менее вложения продолжаются.";
+  const strict = rewriter.rewrite(source, { dashes: false, antithesis: false, rhythm: false, openers: false });
+  const loose = rewriter.rewrite(source, { dashes: false, antithesis: false, rhythm: false, openers: false, loose: true });
+  assert.match(strict.text, /Однако маржинальность/);
+  assert.match(loose.text, /Но маржинальность/);
+  assert.equal(loose.actions.loosened, 2);
+});
+
+test("логика связки сохраняется: противительная остаётся противительной", () => {
+  const source = "Выручка выросла. Однако издержки выросли быстрее.";
+  const loose = rewriter.rewrite(source, { dashes: false, antithesis: false, rhythm: false, openers: false, loose: true });
+  // «Но» — та же логика, другой регистр. Удалять связку здесь нельзя: без неё
+  // предложения читаются как согласованные, хотя они противопоставлены.
+  assert.match(loose.text, /Но издержки выросли быстрее/);
+});
+
+test("английские книжные зачины понижаются так же", () => {
+  const source = "Revenue grew. Nevertheless margins stayed low. Therefore the plan needs review.";
+  const loose = rewriter.rewrite(source, { dashes: false, antithesis: false, rhythm: false, openers: false, loose: true });
+  assert.match(loose.text, /But margins stayed low/);
+  assert.match(loose.text, /So the plan needs review/);
+});
+
+test("без свободного режима книжные зачины не трогаются", () => {
+  const source = "Revenue grew. Nevertheless margins stayed low.";
+  const strict = rewriter.rewrite(source, { dashes: false, antithesis: false, rhythm: false, openers: false });
+  assert.equal(strict.text, source);
+  assert.equal(strict.actions.loosened, 0);
+});

@@ -114,3 +114,21 @@ test("язык можно задать явно, минуя определени
   assert.equal(result.language, "ru");
   assert.equal(result.text, "The team will utilize the model.");
 });
+
+test("деловой английский B2-C1: вычурная лексика упрощается без разговорности", () => {
+  const source = "The company commenced operations and subsequently demonstrated sufficient growth with regard to numerous markets.";
+  const result = paraphraser.paraphraseText(source, "en").text;
+  assert.match(result, /began operations/);
+  assert.match(result, /later showed enough growth/);
+  assert.match(result, /about many markets/);
+  // Разговорность не вводится: сокращённых форм в академическом тексте быть
+  // не должно, и упрощение регистра их не оправдывает.
+  assert.doesNotMatch(result, /\b(?:don't|isn't|can't|it's|get)\b/i);
+});
+
+test("формы глагола не смешиваются", () => {
+  const infinitive = paraphraser.paraphraseText("Stakeholders aim to facilitate the process.", "en").text;
+  const third = paraphraser.paraphraseText("The platform facilitates the process.", "en").text;
+  assert.match(infinitive, /to support the process/);
+  assert.match(third, /supports the process/);
+});

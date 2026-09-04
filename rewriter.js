@@ -35,6 +35,16 @@
   };
 
   // Связки, после которых разрыв на два предложения остаётся грамматичным.
+  // Свободный режим: новое предложение начинается голым союзом вместо
+  // книжной связки. «Однако» — та самая связка, которую инструмент штрафует
+  // в других слоях, а «Но» на её месте короче, живее и встречается в
+  // человеческой письменной речи постоянно. Включается там, где текст беден
+  // фактами: небрежность уместна как след автора, а не как приём.
+  const LOOSE_CONNECTIVES = {
+    ru: { "но": "Но", "однако": "Но", "а": "А", "и": "И", "поэтому": "Поэтому", "следовательно": "Значит" },
+    en: { "but": "But", "yet": "But", "and": "And", "so": "So" },
+  };
+
   const SPLIT_CONNECTIVES = {
     ru: { "но": "Однако", "однако": "Однако", "поэтому": "Поэтому", "следовательно": "Следовательно", "а": "" },
     en: { "but": "However,", "yet": "However,", "so": "Therefore,", "and": "" },
@@ -308,7 +318,7 @@
     return Math.sqrt(variance) / mean;
   }
 
-  function splitCandidate(sentence, language) {
+  function splitCandidate(sentence, language, loose) {
     const locale = language === "ru" ? "ru" : "en";
     const semicolon = sentence.indexOf("; ");
     if (semicolon > 0) {
@@ -318,7 +328,10 @@
         return [`${head}.`, capitalize(tail, locale)];
       }
     }
-    const connectives = SPLIT_CONNECTIVES[language] || SPLIT_CONNECTIVES.en;
+    const base = SPLIT_CONNECTIVES[language] || SPLIT_CONNECTIVES.en;
+    const connectives = loose
+      ? Object.assign({}, base, LOOSE_CONNECTIVES[language] || LOOSE_CONNECTIVES.en)
+      : base;
     const starters = CLAUSE_STARTERS[language] || CLAUSE_STARTERS.en;
     const pattern = new RegExp(`,\\s+(${Object.keys(connectives).join("|")})\\s+`, "iu");
     const match = sentence.match(pattern);
@@ -355,7 +368,7 @@
     return refs;
   }
 
-  function tuneRhythm(units, language) {
+  function tuneRhythm(units, language, loose) {
     let refs = collectSentenceRefs(units);
     if (refs.length < 3) return { splits: 0, merges: 0 };
 
@@ -371,7 +384,7 @@
       for (let position = 0; position < refs.length; position += 1) {
         const ref = refs[position];
         const sentence = ref.unit.sentences[ref.index];
-        const parts = splitCandidate(sentence, language);
+        const parts = splitCandidate(sentence, language, loose);
         if (parts) {
           const next = lengths.slice();
           next.splice(position, 1, countWords(parts[0]), countWords(parts[1]));
@@ -638,6 +651,46 @@
     return { text: result.join("\n\n"), created };
   }
 
+  // Понижение книжной связки в начале предложения до простого союза.
+  //
+  // «Однако» несёт логику, поэтому пасс 21 его не удаляет — и правильно
+  // делает. Но между «Однако» и «Но» разница не логическая, а регистровая:
+  // первое книжное, второе живое, и в человеческой прозе второе встречается
+  // несравнимо чаще. Замена безопасна: она стоит в начале предложения, не
+  // трогает согласование и не требует разбора клаузы.
+  //
+  // Включается только в свободном режиме — там, где текст беден фактами.
+  // В плотном тексте лишняя небрежность ни к чему.
+  const BOOKISH_OPENERS = {
+    ru: [
+      [/(?<=^|[.!?…]["»”')\]]?\s)Однако,?\s/gu, "Но "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Тем не менее,?\s/gu, "Но "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Следовательно,?\s/gu, "Значит, "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Вместе с тем,?\s/gu, "При этом "],
+    ],
+    en: [
+      [/(?<=^|[.!?…]["»”')\]]?\s)Nevertheless,?\s/gu, "But "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Nonetheless,?\s/gu, "But "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Consequently,?\s/gu, "So "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Therefore,?\s/gu, "So "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Furthermore,?\s/gu, "Also, "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Additionally,?\s/gu, "Also, "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Hence,?\s/gu, "So "],
+    ],
+  };
+
+  function loosenOpeners(text, language) {
+    let result = String(text);
+    let changed = 0;
+    for (const [pattern, replacement] of BOOKISH_OPENERS[language] || BOOKISH_OPENERS.en) {
+      result = result.replace(pattern, () => {
+        changed += 1;
+        return replacement;
+      });
+    }
+    return { text: result, changed };
+  }
+
   function rewrite(input, options) {
     const settings = options || {};
     const source = String(input || "");
@@ -650,18 +703,19 @@
 
     const dashes = settings.dashes === false ? 0 : decomposeDashes(units, language);
     const antithesis = settings.antithesis === false ? 0 : rewriteAntithesis(units, language);
-    const rhythm = settings.rhythm === false ? { splits: 0, merges: 0 } : tuneRhythm(units, language);
+    const rhythm = settings.rhythm === false ? { splits: 0, merges: 0 } : tuneRhythm(units, language, settings.loose === true);
     const openers = settings.openers === false ? 0 : varyOpeners(units, language);
 
     const assembled = guard.restore(fromDocument(units));
     const paragraphs = settings.paragraphs === true ? reflowParagraphs(assembled) : { text: assembled, created: 0 };
+    const loosened = settings.loose === true ? loosenOpeners(paragraphs.text, language) : { text: paragraphs.text, changed: 0 };
 
     return {
-      text: paragraphs.text,
+      text: loosened.text,
       language,
-      actions: { dashes, antithesis, splits: rhythm.splits, merges: rhythm.merges, openers, paragraphs: paragraphs.created },
+      actions: { dashes, antithesis, splits: rhythm.splits, merges: rhythm.merges, openers, paragraphs: paragraphs.created, loosened: loosened.changed },
     };
   }
 
-  return { rewrite, varyOpeners, reflowParagraphs, detectLanguage, countWords, coefficientOfVariation, TARGET_CV };
+  return { rewrite, varyOpeners, loosenOpeners, reflowParagraphs, detectLanguage, countWords, coefficientOfVariation, TARGET_CV };
 });

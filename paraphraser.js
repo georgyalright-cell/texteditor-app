@@ -124,6 +124,44 @@
     // to» поднимал бы оценку, не имея ни одной трансформации.
     [/\bwell-positioned to\b/giu, ["able to"]],
 
+    // Ориентир регистра — деловой английский уровня B2-C1, как в методичке.
+    // Это не упрощение ради упрощения: вычурная латинская лексика в деловом
+    // тексте читается как переводная или машинная, а требование методички —
+    // ясность. Разговорность при этом не вводится: никаких сокращённых форм,
+    // никаких «get» и фразовых глаголов, регистр остаётся деловым.
+    [/\bcommences\b/giu, ["begins"]],
+    [/\bcommence\b/giu, ["begin"]],
+    [/\bcommenced\b/giu, ["began"]],
+    [/\bcommencement\b/giu, ["start"]],
+    [/\bfacilitates\b/giu, ["supports"]],
+    [/\bfacilitate\b/giu, ["support"]],
+    [/\bfacilitated\b/giu, ["supported"]],
+    [/\bdemonstrates\b/giu, ["shows"]],
+    [/\bdemonstrate\b/giu, ["show"]],
+    [/\bdemonstrated\b/giu, ["showed"]],
+    [/\bendeavours\b/giu, ["aims"]],
+    [/\bendeavour\b/giu, ["aim"]],
+    [/\bterminates\b/giu, ["ends"]],
+    [/\bterminate\b/giu, ["end"]],
+    [/\bterminated\b/giu, ["ended"]],
+    [/\bsufficient\b/giu, ["enough"]],
+    [/\bnumerous\b/giu, ["many"]],
+    [/\bapproximately\b/giu, ["about"]],
+    [/\bwith regard to\b/giu, ["about"]],
+    [/\bwith respect to\b/giu, ["about"]],
+    [/\bin relation to\b/giu, ["about"]],
+    [/\bsubsequently\b/giu, ["later"]],
+    [/\ba number of\b/giu, ["several"]],
+    [/\bascertain\b/giu, ["establish"]],
+    [/\binitiates\b/giu, ["starts"]],
+    [/\binitiate\b/giu, ["start"]],
+    [/\binitiated\b/giu, ["started"]],
+    [/\bendeavours to\b/giu, ["aims to"]],
+    [/\bin the vicinity of\b/giu, ["near"]],
+    [/\bnotwithstanding\b/giu, ["despite"]],
+    [/\bheretofore\b/giu, ["until now"]],
+    [/\bthereafter\b/giu, ["after that"]],
+
     // Диалект бизнес-плана. Замены только там, где оборот действительно
     // пустой: «comprehensive framework» — это framework, «proactive risk
     // management» — это risk management. Термины, за которыми стоит
