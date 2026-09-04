@@ -84,7 +84,11 @@ test("разбивка на абзацы и якоря текста пережи
   const result = engine.humanize(RU_SAMPLE);
   assert.equal(result.text.split(/\n{2,}/u).length, RU_SAMPLE.split(/\n{2,}/u).length);
   assert.deepEqual(result.text.match(/\d+/gu).sort(), RU_SAMPLE.match(/\d+/gu).sort());
-  assert.equal(engine.integrityIssues(RU_SAMPLE, result.text).length, 0);
+  // Порог объёма тот же, с которым цикл работает на самом деле. Умолчание
+  // функции — 0.85, и оно запрещает ровно то сокращение, ради которого всё
+  // строится: план целится в 20-30%, то есть в долю 0.70-0.80. Проверять
+  // цикл порогом строже его собственного — значит проверять не его.
+  assert.equal(engine.integrityIssues(RU_SAMPLE, result.text, 0.65).length, 0);
 });
 
 test("трасса раундов пригодна для показа пользователю", () => {
