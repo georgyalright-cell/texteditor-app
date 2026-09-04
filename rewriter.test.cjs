@@ -234,3 +234,27 @@ test("без свободного режима книжные зачины не 
   assert.equal(strict.text, source);
   assert.equal(strict.actions.loosened, 0);
 });
+
+test("книжные связки не схлопываются в один союз", () => {
+  const source = "Рынок вырос. Однако маржинальность низкая. Тем не менее вложения продолжаются.";
+  const loose = rewriter.rewrite(source, { dashes: false, antithesis: false, rhythm: false, openers: false, loose: true });
+  // Два «Но» подряд — это повтор зачина, за который штрафует отдельная
+  // метрика: понижая регистр, нельзя одновременно портить ритм.
+  assert.match(loose.text, /Но маржинальность/);
+  assert.match(loose.text, /И всё же вложения/);
+});
+
+test("в свободном режиме остаётся один короткий абзац", () => {
+  const block = Array.from(
+    { length: 12 },
+    (_item, index) => `Предложение ${index + 1} описывает работу команды за отчётный период года.`,
+  ).join(" ");
+  const source = [block, block, block].join("\n\n");
+  const strict = rewriter.reflowParagraphs(source, {});
+  const loose = rewriter.reflowParagraphs(source, { loose: true });
+  const lengths = (outcome) => outcome.text.split("\n\n").map((item) => rewriter.countWords(item));
+  const shortest = (outcome) => Math.min(...lengths(outcome));
+  assert.ok(shortest(loose) < shortest(strict), "короткий абзац должен появиться только в свободном режиме");
+  // Ровно один: россыпь огрызков — это уже приём, а не небрежность.
+  assert.equal(lengths(loose).filter((value) => value < 55).length, 1);
+});

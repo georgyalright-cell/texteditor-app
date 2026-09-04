@@ -595,6 +595,7 @@
   }
 
   function reflowParagraphs(text, options) {
+    const loose = Boolean(options && options.loose);
     const settings = options || {};
     const minimum = settings.min || PARAGRAPH_MIN_WORDS;
     const maximum = settings.max || PARAGRAPH_MAX_WORDS;
@@ -609,6 +610,7 @@
     if (spread !== null && spread >= PARAGRAPH_TARGET_CV) return { text: source, created: 0 };
 
     const nextTarget = makeRandom(seedFrom(source));
+    let shortKept = false;
     const result = [];
     let created = 0;
 
@@ -639,10 +641,19 @@
       }
       if (current.length) {
         const tail = current.join(" ");
-        // Хвост короче минимума прирастает к предыдущему куску, иначе в конце
-        // раздела повисает огрызок в одну строку.
-        if (blocks.length && currentWords < minimum) blocks[blocks.length - 1] += ` ${tail}`;
-        else blocks.push(tail);
+        // Хвост короче минимума обычно прирастает к предыдущему куску, иначе в
+        // конце раздела повисает огрызок в одну строку. В свободном режиме
+        // один такой огрызок оставляется намеренно: короткий абзац посреди
+        // ровных — то, чего у машинного текста не бывает.
+        const keepShort = loose && !shortKept && countWords(tail) >= 8 && blocks.length > 0;
+        if (keepShort) {
+          shortKept = true;
+          blocks.push(tail);
+        } else if (blocks.length && currentWords < minimum) {
+          blocks[blocks.length - 1] += ` ${tail}`;
+        } else {
+          blocks.push(tail);
+        }
       }
       if (blocks.length > 1) created += blocks.length - 1;
       result.push(...blocks);
@@ -664,18 +675,24 @@
   const BOOKISH_OPENERS = {
     ru: [
       [/(?<=^|[.!?…]["»”')\]]?\s)Однако,?\s/gu, "Но "],
-      [/(?<=^|[.!?…]["»”')\]]?\s)Тем не менее,?\s/gu, "Но "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Тем не менее,?\s/gu, "И всё же "],
       [/(?<=^|[.!?…]["»”')\]]?\s)Следовательно,?\s/gu, "Значит, "],
       [/(?<=^|[.!?…]["»”')\]]?\s)Вместе с тем,?\s/gu, "При этом "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Таким образом,?\s/gu, "Значит, "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)В связи с этим,?\s/gu, "Поэтому "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)В частности,?\s/gu, "Например, "],
     ],
     en: [
       [/(?<=^|[.!?…]["»”')\]]?\s)Nevertheless,?\s/gu, "But "],
-      [/(?<=^|[.!?…]["»”')\]]?\s)Nonetheless,?\s/gu, "But "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Nonetheless,?\s/gu, "Still, "],
       [/(?<=^|[.!?…]["»”')\]]?\s)Consequently,?\s/gu, "So "],
       [/(?<=^|[.!?…]["»”')\]]?\s)Therefore,?\s/gu, "So "],
       [/(?<=^|[.!?…]["»”')\]]?\s)Furthermore,?\s/gu, "Also, "],
       [/(?<=^|[.!?…]["»”')\]]?\s)Additionally,?\s/gu, "Also, "],
       [/(?<=^|[.!?…]["»”')\]]?\s)Hence,?\s/gu, "So "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Thus,?\s/gu, "So "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)In addition,?\s/gu, "Also, "],
+      [/(?<=^|[.!?…]["»”')\]]?\s)Moreover,?\s/gu, "Also, "],
     ],
   };
 
@@ -707,7 +724,9 @@
     const openers = settings.openers === false ? 0 : varyOpeners(units, language);
 
     const assembled = guard.restore(fromDocument(units));
-    const paragraphs = settings.paragraphs === true ? reflowParagraphs(assembled) : { text: assembled, created: 0 };
+    const paragraphs = settings.paragraphs === true
+      ? reflowParagraphs(assembled, { loose: settings.loose === true })
+      : { text: assembled, created: 0 };
     const loosened = settings.loose === true ? loosenOpeners(paragraphs.text, language) : { text: paragraphs.text, changed: 0 };
 
     return {
