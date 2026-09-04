@@ -86,6 +86,9 @@
     ["однако", "medium"], ["тем не менее", "medium"], ["поэтому", "medium"],
     // Те же обороты, в которые словарь превращает связки выше.
     ["наряду с этим", "high"], ["помимо этого", "high"], ["к тому же", "high"], ["в итоге", "high"],
+    // «В заключение» сигнал считал, а снять его было нечем: в английском
+    // списке вводных оборотов «in conclusion» есть, в русском парного не было.
+    ["в заключение", "high"],
   ];
   const CONNECTIVES_EN = [
     ["moreover", "high"], ["furthermore", "high"], ["additionally", "high"],
@@ -93,6 +96,10 @@
     ["consequently", "high"], ["as a result", "high"], ["in particular", "high"],
     ["also", "high"], ["finally", "medium"], ["however", "medium"],
     ["nevertheless", "medium"], ["nonetheless", "medium"], ["that said", "medium"],
+    // Те же обороты, в которые словарь превращает связки выше. Русский
+    // список это правило соблюдал, английский — нет: «furthermore» словарь
+    // менял на «beyond that», сигнал его считал, а снять его было нечем.
+    ["beyond that", "high"], ["overall", "high"], ["to conclude", "high"], ["in brief", "high"],
   ];
 
   // ─── 19. Ритмический пасс ──────────────────────────────────────────────

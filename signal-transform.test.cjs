@@ -75,7 +75,6 @@ test("словарь снимает диалект бизнес-плана, не
 // синонима нет в списке дискурсивных зачинов, сигнал обнуляется, хотя текст
 // не изменился по характеру. Всё, во что словарь превращает связки, обязано
 // оставаться под наблюдением.
-const passes = require("./edit-passes.js");
 require("./anchor-guard.js");
 
 function producedByDictionary(language) {
@@ -133,3 +132,77 @@ test("обороты, в которые словарь превращает св
   });
   assert.deepEqual(orphans, [], `сигнал перекладывается в тупик: ${orphans.join(" | ")}`);
 });
+
+// ─── Отмывание связок ────────────────────────────────────────────────────
+//
+// Второй вид того же инварианта. Словарь варьирует связки в начале
+// предложения, чтобы абзацы не начинались одинаково, — и в этот момент
+// может подменить наблюдаемую связку синонимом, которого сигнал не видит
+// или который нечем снять. Тогда оценка падает, а текст не меняется.
+//
+// Проверка нашла ровно это: «furthermore» превращалось в «Beyond that»,
+// сигнал его считал, а в списке пасса 21 его не было.
+
+const passes = require("./edit-passes.js");
+
+function openerOf(text) {
+  return String(text).replace(/^[^\p{L}]+/u, "").toLocaleLowerCase("ru");
+}
+
+function watched(list, opener) {
+  return list.some((phrase) => opener.startsWith(phrase));
+}
+
+function removable(phrase, language) {
+  const filler = Array.from({ length: 6 }, (_, index) =>
+    language === "ru"
+      ? `Предложение номер ${index + 1} несёт обычное содержание для пасса.`
+      : `Sentence number ${index + 1} carries ordinary content for the pass.`,
+  ).join(" ");
+  const capital = phrase.charAt(0).toLocaleUpperCase(language) + phrase.slice(1);
+  const tail = language === "ru" ? "команда выпустила релиз вовремя." : "the team shipped the release on time.";
+  // Три вхождения, а не два: пасс 21 намеренно оставляет хотя бы одну связку
+  // ради нижней границы зоны жанра, и на двух он не снимает ни одной.
+  const source = `${filler} ${capital}, ${tail} ${capital}, ${tail} ${capital}, ${tail}`;
+  // Проверяется существование правки, а не её автоматическое применение.
+  // Противительные и итоговые связки пасс держит на medium намеренно: их
+  // снятие меняет логику, и решает автор. Но путь снятия у них есть, и
+  // инвариант ровно об этом.
+  const proposal = passes.propose(source, { language });
+  return proposal.edits.some(
+    (edit) => edit.before && edit.before.toLocaleLowerCase(language).includes(phrase),
+  );
+}
+
+for (const language of ["ru", "en"]) {
+  const list = language === "ru" ? metrics.DISCOURSE_RU : metrics.DISCOURSE_EN;
+
+  test(`${language}: словарь не подменяет связку тем, чего сигнал не видит`, () => {
+    const laundered = [];
+    for (const phrase of list) {
+      const capital = phrase.charAt(0).toLocaleUpperCase(language) + phrase.slice(1);
+      const tail = language === "ru" ? "команда выпустила релиз вовремя." : "the team shipped the release on time.";
+      const rewritten = paraphraser.paraphraseText(`${capital}, ${tail}`, language).text;
+      const opener = openerOf(rewritten);
+      if (!opener) continue;
+      if (!watched(list, opener)) laundered.push(`${phrase} → ${opener.slice(0, 30)}`);
+    }
+    assert.deepEqual(laundered, [], `связка подменена на ненаблюдаемую: ${laundered.join("; ")}`);
+  });
+
+  test(`${language}: каждую наблюдаемую связку есть чем снять`, () => {
+    // Противительные связки несут логику, их снятие меняет смысл — пасс 21
+    // держит их на medium и по умолчанию не применяет. Проверяются только
+    // присоединительные и итоговые.
+    const logical = language === "ru"
+      ? ["однако", "тем не менее", "с одной стороны", "с другой стороны", "в то же время", "вместе с тем"]
+      : ["however", "nevertheless", "nonetheless", "on the one hand", "on the other hand", "that said"];
+    // Вводные обороты вида «важно отметить, что» снимает пасс 18, и снимает
+    // вместе с придаточным — в конструкции без «что» их проверять нечем.
+    const leadIn = /^(во-|в-|firstly|secondly|thirdly|it is|it should|важно отметить|следует отметить|стоит отметить|необходимо отметить|отметим|заметим|подчеркнём)/u;
+    const orphans = list.filter(
+      (phrase) => !logical.includes(phrase) && !leadIn.test(phrase) && !removable(phrase, language),
+    );
+    assert.deepEqual(orphans, [], `связка без пути снятия: ${orphans.join(", ")}`);
+  });
+}
