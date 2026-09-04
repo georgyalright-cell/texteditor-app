@@ -28,7 +28,43 @@ test("абстрактные существительные на кирилли�
 test("дискурсивные зачины и повтор зачинов уходят выше зоны", () => {
   const report = metrics.analyze(MACHINE_RU, { genreId: "academic" });
   assert.equal(report.metrics.find((item) => item.id === "discourseShare").status, "high");
-  assert.equal(report.metrics.find((item) => item.id === "openerRepeat").status, "high");
+  // У повтора зачинов теперь две границы, а не одна, поэтому сильное
+  // превышение называется «перелётом», а не «выше зоны». Проверяется то же
+  // самое: значение вышло за пределы нормы.
+  assert.ok(["high", "overshoot"].includes(report.metrics.find((item) => item.id === "openerRepeat").status));
+});
+
+test("повтор лексики и зачинов имеет пол, а не только потолок", () => {
+  // Машина повторяет меньше человека, а не больше: медиана повтора лексики
+  // 0.054 в русском корпусе и 0.21 в английском, у сгенерированного текста
+  // ноль. Пока у метрики был только потолок, этот ноль лежал внутри зоны и
+  // читался как «хорошо».
+  const zone = (id, language) =>
+    metrics.analyze("текст", { genreId: "academic", language }).metrics.find((item) => item.id === id).zone;
+  assert.ok(zone("ngramRepeat", "ru").min > 0);
+  assert.ok(zone("openerRepeat", "ru").min > 0);
+  assert.ok(zone("ngramRepeat", "en").min > 0);
+  assert.ok(zone("openerRepeat", "en").min > 0);
+});
+
+test("плоские метрики ловят машинный текст: знаков нет, длинных периодов нет", () => {
+  const report = metrics.analyze(MACHINE_RU, { genreId: "academic" });
+  assert.equal(report.metrics.find((item) => item.id === "punctInventory").status, "low");
+  assert.equal(report.metrics.find((item) => item.id === "longSentences").status, "low");
+});
+
+test("живой текст со скобками и длинным периодом плоским не считается", () => {
+  const alive = [
+    "Рынок вырос на 12% за 2024 год (по данным Росстата), причём почти весь прирост дала одна категория — готовая еда, которая ещё три года назад держалась в пределах статистической погрешности и не попадала в отраслевые обзоры вовсе.",
+    "Дальше сложнее: региональные сети росли медленнее, а федеральные — быстрее.",
+    "Мы считали по чекам, не по отгрузкам; расхождение с отчётностью сетей достигает 4%.",
+    "Причина известна и скучна: возвраты учитываются в разные периоды.",
+    "Отдельно стоит гипермаркет, потерявший 3% трафика.",
+    "Это первый год, когда формат ушёл в минус.",
+  ].join(" ");
+  const report = metrics.analyze(alive, { genreId: "academic", language: "ru" });
+  assert.notEqual(report.metrics.find((item) => item.id === "punctInventory").status, "low");
+  assert.notEqual(report.metrics.find((item) => item.id === "longSentences").status, "low");
 });
 
 test("плотность якорей считает числа, даты и имена", () => {

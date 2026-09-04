@@ -35,10 +35,18 @@
       parts.push("Безопасные словарные правки: подходящих замен не найдено.");
     }
     parts.push(root.HumanizerEngine.describeRounds(humanized));
-    if (!humanized.reachedTarget) {
+    // Предупреждение отвязано от цели цикла. Цель — медиана живого корпуса,
+    // и не дойти до неё нормально: три четверти живых текстов до неё тоже не
+    // доходят. Тревожит не это, а оставшаяся заметная машинность, то есть
+    // выход за третий квартиль.
+    const quiet = root.HumanizerEngine.quietBelow
+      ? root.HumanizerEngine.quietBelow(humanized.language)
+      : humanized.target;
+    if (!humanized.reachedTarget && humanized.after && humanized.after.score > quiet) {
       parts.push(
-        `Порог ${humanized.target} не достигнут: для оставшихся признаков нет замены, ` +
-          "которая гарантированно не сломает грамматику, — их нужно править вручную.",
+        `Оценка ${humanized.after.score} осталась выше типичной для живого текста (${quiet}): ` +
+          "для оставшихся признаков нет замены, которая гарантированно не сломает грамматику, — " +
+          "их нужно править вручную.",
       );
     }
     const cleaning = changeSummary(cleaningStats);
@@ -97,6 +105,21 @@
         paraphrased = Object.assign({}, paraphrased, { text: chosen.text, selected: chosen.chosen });
       }
     }
+    // Разноминализация проходит один раз здесь, а не действием цикла.
+    // Причина в измерении: метрика A6 считает суффиксы, и большую часть её
+    // веса дают обычные слова предметной области — «производство»,
+    // «образование», «operations», «equipment». Развернуть их в глагол
+    // нельзя, значит и рулём для цикла эта метрика служить не может: сигнал,
+    // который транформация не двигает, заставляет цикл гнаться за
+    // недостижимым. То, что развернуть можно, разворачивается один раз, а
+    // цепочки, требующие согласования падежей, уходят автору в панель.
+    let denominalized = { text: paraphrased.text, applied: 0 };
+    if (root.EditPasses) {
+      const pass = root.EditPasses.applyPass(paraphrased.text, "denominalization", {
+        language: paraphrased.language,
+      });
+      if (pass.changed) denominalized = pass;
+    }
     // Типографика идёт ДО цикла, а не после. Она обязана набрать дефис между
     // словами длинным тире — это правильный набор, — но длинное тире и есть
     // самый заметный машинный признак, и цикл его штрафует тяжелее прочих.
@@ -105,7 +128,7 @@
     // финальные знаки и сам решает, какие из них разворачивать в предложение
     // или в скобки, а какие оставить: тире, которое он оставил, остаётся
     // осознанным решением, а не следствием порядка вызовов.
-    const typography = root.Typography.normalize(paraphrased.text);
+    const typography = root.Typography.normalize(denominalized.text);
     const loose = looseNeeded(typography.text);
     const humanized = root.HumanizerEngine.humanize(typography.text, {
       language: paraphrased.language,

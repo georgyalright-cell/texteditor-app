@@ -139,6 +139,36 @@
     ["на основании того, что", "потому что"],
     ["в том случае, если", "если"],
     ["в том числе и", "в том числе"],
+    // Что генерация производит на самом деле, а не что бывает в учебнике
+    // канцелярита. Список собран по машинному корпусу: замеряли, какие
+    // отглагольные обороты встречаются в сгенерированном тексте, и брали из
+    // них те, после которых зависимое слово остаётся в том же падеже.
+    ["с целью", "для"],
+    ["по причине", "из-за"],
+    ["в связи с тем, что", "потому что"],
+    ["несмотря на то, что", "хотя"],
+    ["в силу того, что", "потому что"],
+    ["ввиду того, что", "потому что"],
+    ["за исключением", "кроме"],
+    ["осуществляет деятельность", "работает"],
+    ["осуществляют деятельность", "работают"],
+    ["в значительной степени", "во многом"],
+    ["в существенной степени", "во многом"],
+    ["в определённой степени", "отчасти"],
+    ["в определенной степени", "отчасти"],
+    ["в достаточной степени", "достаточно"],
+    ["в полной мере", "полностью"],
+    ["на постоянной основе", "постоянно"],
+    ["в обязательном порядке", "обязательно"],
+    ["в кратчайшие сроки", "быстро"],
+    ["в большинстве случаев", "обычно"],
+    ["в ряде случаев", "иногда"],
+    ["в настоящее время", "сейчас"],
+    ["в настоящий момент", "сейчас"],
+    ["на сегодняшний день", "сегодня"],
+    ["в дальнейшем", "дальше"],
+    ["в конечном итоге", "в итоге"],
+    ["в первую очередь", "прежде всего"],
   ];
   const DENOMINALIZATION_EN = [
     ["makes a contribution to", "contributes to"],
@@ -157,18 +187,96 @@
     ["is supportive of", "supports"],
     ["has the capability to", "can"],
     ["in the absence of", "without"],
+    // Английскому разворачивать номинализацию безопаснее: падежей нет, и
+    // «the implementation of the plan» → «implementing the plan» не может
+    // рассогласовать зависимое слово. Опасен только предлог слева: «during
+    // the implementation of» → «during implementing» читается коряво, и
+    // такие места отсеиваются заглядыванием назад в collectDenominalization.
+    ["makes a decision", "decides"],
+    ["make a decision", "decide"],
+    ["reaches a conclusion", "concludes"],
+    ["reach a conclusion", "conclude"],
+    ["take into consideration", "consider"],
+    ["takes into consideration", "considers"],
+    ["gives consideration to", "considers"],
+    ["give consideration to", "consider"],
+    ["conducts an analysis of", "analyses"],
+    ["conduct an analysis of", "analyse"],
+    ["performs an evaluation of", "evaluates"],
+    ["perform an evaluation of", "evaluate"],
+    ["undertakes a review of", "reviews"],
+    ["undertake a review of", "review"],
+    ["provides assistance to", "assists"],
+    ["provide assistance to", "assist"],
+    ["provides an overview of", "outlines"],
+    ["makes reference to", "refers to"],
+    ["make reference to", "refer to"],
+    ["gives rise to", "causes"],
+    ["give rise to", "cause"],
+    ["is representative of", "represents"],
+    ["are representative of", "represent"],
+    ["has the ability to", "can"],
+    ["have the ability to", "can"],
+    ["in the event that", "if"],
+    ["in spite of the fact that", "although"],
+    ["due to the fact that", "because"],
+    ["with the exception of", "except"],
+    ["for the purpose of", "for"],
+    ["for the purposes of", "for"],
+    ["at this point in time", "now"],
+    ["a number of", "several"],
+    ["the majority of", "most"],
+    ["in order to", "to"],
   ];
+
+  // «the implementation of» → «implementing». Замена держится закрытым
+  // списком, потому что глагол от существительного по правилу не строится:
+  // «the analysis of» даёт «analysing», а «the provision of» — «providing».
+  // Слева не должно стоять предлога: «during implementing the project»
+  // грамматично, но так не пишут.
+  const GERUND_EN = [
+    ["implementation", "implementing"],
+    ["introduction", "introducing"],
+    ["establishment", "establishing"],
+    ["identification", "identifying"],
+    ["assessment", "assessing"],
+    ["evaluation", "evaluating"],
+    ["consideration", "considering"],
+    ["improvement", "improving"],
+    ["expansion", "expanding"],
+    ["adoption", "adopting"],
+    ["integration", "integrating"],
+    ["allocation", "allocating"],
+    ["application", "applying"],
+    ["utilization", "using"],
+    ["utilisation", "using"],
+    ["development", "developing"],
+    ["management", "managing"],
+    ["measurement", "measuring"],
+    ["reduction", "reducing"],
+    ["creation", "creating"],
+  ];
+  const GERUND_LEFT = "(?<!\\b(?:of|in|on|for|to|with|during|after|before|by|from|through|within|under|at|about|and|or)\\s)";
 
   // Места, где номинализацию видно, но замена требует согласования падежей.
   // Показываются автору с готовой подсказкой — правит он.
   const MANUAL_NOMINALIZATION_RU = [
-    [new RegExp(`${EDGE_LEFT}(осуществляется|осуществляются|производится|производятся|проводится|проводятся|происходит|происходят|наблюдается|наблюдаются|ведётся|ведется)${SPACE}+(?:\\p{L}{4,}(?:ание|ение|ация|изация|ирование)|рост|роста|снижение|увеличение|падение|прирост)${EDGE_RIGHT}`, "giu"),
+    [new RegExp(`${EDGE_LEFT}(осуществляется|осуществляются|производится|производятся|проводится|проводятся|происходит|происходят|наблюдается|наблюдаются|ведётся|ведется|реализуется|реализуются|обеспечивается|обеспечиваются|достигается|достигаются|определяется|определяются|характеризуется|характеризуются)${SPACE}+(?:\\p{L}{4,}(?:ание|ение|ация|изация|ирование)|рост|роста|снижение|увеличение|падение|прирост)${EDGE_RIGHT}`, "giu"),
       "разверните в глагол и поставьте подлежащее в именительный: «наблюдается рост выручки» → «выручка растёт»"],
     [new RegExp(`${EDGE_LEFT}(являе?тся|являются)${SPACE}+(причиной|следствием|результатом|источником)${EDGE_RIGHT}`, "giu"),
       "замените связкой-глаголом: «является причиной задержек» → «вызывает задержки» (падеж придётся поправить)"],
     [new RegExp(`${EDGE_LEFT}(оказывает|оказывают)${SPACE}+(поддержку|содействие|помощь|воздействие)${EDGE_RIGHT}`, "giu"),
       "замените глаголом: «оказывает поддержку малому бизнесу» → «поддерживает малый бизнес»"],
+    [new RegExp(`${EDGE_LEFT}(представляет|представляют)${SPACE}+собой${EDGE_RIGHT}`, "giu"),
+      "уберите связку: «представляет собой сложный процесс» → «это сложный процесс» (падеж придётся поправить)"],
+    [new RegExp(`${EDGE_LEFT}(носит|носят)${SPACE}+\\p{L}+(?:ый|ий|ой)${SPACE}+характер${EDGE_RIGHT}`, "giu"),
+      "разверните в сказуемое: «носит системный характер» → «системен»"],
+    [new RegExp(`${EDGE_LEFT}(играет|играют|имеет|имеют)${SPACE}+(?:важную|ключевую|значительную|большую|существенную|особую)${SPACE}+(?:роль|значение)${EDGE_RIGHT}`, "giu"),
+      "скажите, в чём именно роль, или уберите оборот: он не добавляет проверяемого"],
+    [new RegExp(`${EDGE_LEFT}(?:\\p{L}{4,}(?:ение|ание|ация)${SPACE}+){2,}`, "giu"),
+      "цепочка отглагольных существительных: «обеспечение повышения эффективности» — разверните хотя бы одно звено в глагол"],
   ];
+
   const MANUAL_NOMINALIZATION_EN = [
     [new RegExp(`${EDGE_LEFT}(?:the|an?)${SPACE}+(\\p{L}{4,}(?:tion|sion|ment))${SPACE}+of${EDGE_RIGHT}`, "giu"),
       "разверните в глагол: «the implementation of the plan» → «we implemented the plan» или «the plan was implemented»"],
@@ -184,9 +292,11 @@
     connectives: "21 · снятие связок",
     rhythm: "19 · ритм",
     denominalization: "22 · разноминализация",
+    punctuation: "23 · инвентарь пунктуации",
+    period: "24 · длинный период",
   };
 
-  const PRIORITY = { reduction: 1, connectives: 2, denominalization: 3, rhythm: 4 };
+  const PRIORITY = { reduction: 1, connectives: 2, denominalization: 3, punctuation: 4, period: 5, rhythm: 6 };
 
   function detectLanguage(text) {
     const cyrillic = (String(text).match(/\p{Script=Cyrillic}/gu) || []).length;
@@ -293,6 +403,10 @@
       // не захватом соседнего слова в спан: так диффы остаются короткими и
       // соседние правки не конфликтуют из-за одного общего слова.
       capitalizeAt: options.capitalizeAt === undefined ? null : options.capitalizeAt,
+      // Правка, после которой в тексте появляется период от тридцати пяти
+      // слов. Считается отдельно: ряд из трёх коротких пунктов длинного
+      // периода не рождает, и ограничивать его незачем.
+      createsLong: Boolean(options.createsLong),
       removedWords: Math.max(0, countWords(before) - countWords(options.after)),
     };
   }
@@ -449,6 +563,225 @@
     return edits;
   }
 
+  // ─── 23. Инвентарь пунктуации ──────────────────────────────────────────
+  //
+  // У машинного текста ноль двоеточий, скобок и точек с запятой — сразу по
+  // всем видам знаков, при человеческой медиане 0.77 знака на предложение в
+  // русском. Правки здесь ничего не удаляют и не добавляют слов: попутное
+  // уточнение уходит в скобки, пояснение — за двоеточие. Ровно те места, где
+  // выбор знака однозначен, остальное автору.
+  const PUNCTUATION_RU = [
+    [new RegExp(`,${SPACE}*а именно,?${SPACE}+`, "giu"), ": ", "пояснение ставится за двоеточие, а не за запятую"],
+    [new RegExp(`,${SPACE}*(например|в частности|то есть|в том числе|включая|среди них|скажем),?${SPACE}*([^,.;:()!?]{3,70}),`, "giu"),
+      null, "попутное уточнение уходит в скобки"],
+    [new RegExp(`,${SPACE}*(например|в частности|то есть|включая|среди них|скажем),${SPACE}*([^,.;:()!?]{3,90})([.!?])`, "giu"),
+      null, "попутное уточнение уходит в скобки"],
+  ];
+  const PUNCTUATION_EN = [
+    [new RegExp(`,${SPACE}*namely,?${SPACE}+`, "giu"), ": ", "пояснение ставится за двоеточие"],
+    [new RegExp(`,${SPACE}*(for example|for instance|that is|in particular|including|among them|say),${SPACE}*([^,.;:()!?]{3,70}),`, "giu"),
+      null, "попутное уточнение уходит в скобки"],
+    [new RegExp(`,${SPACE}*(for example|for instance|that is|in particular|including|among them|say),${SPACE}*([^,.;:()!?]{3,90})([.!?])`, "giu"),
+      null, "попутное уточнение уходит в скобки"],
+  ];
+
+  function collectPunctuation(text, language) {
+    const edits = [];
+    const rules = language === "ru" ? PUNCTUATION_RU : PUNCTUATION_EN;
+    for (const [pattern, fixed, reason] of rules) {
+      for (const match of String(text).matchAll(pattern)) {
+        let after;
+        if (fixed) after = fixed;
+        else if (match[3]) after = ` (${match[1]}, ${match[2].trim()})${match[3]}`;
+        else after = ` (${match[1]}, ${match[2].trim()}),`;
+        edits.push(makeEdit({
+          source: text, pass: "punctuation", method: 23,
+          start: match.index, end: match.index + match[0].length,
+          after, reason, confidence: "high",
+        }));
+      }
+    }
+    return edits;
+  }
+
+  // ─── 24. Длинный период ────────────────────────────────────────────────
+  //
+  // Разброс длин этого не даёт: чередуя двенадцать и двадцать слов, можно
+  // получить приличный CV, ни разу не выйдя за тридцать. У живого корпуса
+  // самое длинное предложение фрагмента — 71 слово в русском, у машинного
+  // текста 25. Соседние предложения соединяются точкой с запятой: это всегда
+  // грамматично, если обе части самостоятельны, и заодно поднимает инвентарь
+  // знаков. Больше одного соединения на абзац не делается — иначе появляется
+  // свой собственный ровный ритм, только из длинных периодов.
+  // Можно ли снять заглавную у первого слова второго предложения.
+  //
+  // Якорный гард здесь не помощник: имя собственное он якорем не считает
+  // намеренно — «Ozon» это категория, а не проверяемый факт. Но для слияния
+  // разница решающая: «...сразу; ozon замедлился» — видимая ошибка, которую
+  // никакая последующая проверка не поймает.
+  //
+  // Поэтому требуется положительное свидетельство, а не отсутствие возражений:
+  // либо это слово уже встречается в тексте со строчной (значит, оно
+  // нарицательное), либо оно из закрытого списка служебных зачинов. Всё
+  // остальное — включая незнакомое слово с заглавной — слияние отменяет.
+  const OPENERS_SAFE = {
+    ru: ["это", "этот", "эта", "эти", "этому", "такой", "такая", "такие", "он", "она", "они",
+      "их", "его", "её", "ее", "однако", "кроме", "вместе", "при", "для", "если", "когда",
+      "данный", "данная", "данные", "именно", "здесь", "там", "тогда", "поэтому", "затем"],
+    en: ["this", "that", "these", "those", "it", "they", "he", "she", "such", "however",
+      "but", "and", "if", "when", "there", "here", "then", "both", "each", "most", "many",
+      "the", "a", "an", "some", "other", "another", "its", "their", "his", "her"],
+  };
+
+  function safeToLowercase(text, word, locale) {
+    const lower = word.toLocaleLowerCase(locale);
+    if (lower === word) return false;
+    if (word.slice(1) !== word.slice(1).toLocaleLowerCase(locale)) return false;
+    if (/[\d]/u.test(word)) return false;
+    const list = OPENERS_SAFE[locale] || OPENERS_SAFE.en;
+    if (list.includes(lower)) return true;
+    const elsewhere = new RegExp(`${EDGE_LEFT}${lower.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}${EDGE_RIGHT}`, "u");
+    return elsewhere.test(text);
+  }
+
+  const MERGE_MIN_WORDS = 8;
+  const MERGE_TARGET_WORDS = 35;
+  // Ниже тридцати пяти слов период уже не считается длинным, но пара всё
+  // равно звучит лучше слитно. Такая правка предлагается автору и не
+  // применяется циклом: она про вкус, а не про признак.
+  const MERGE_SOFT_WORDS = 28;
+
+  // Перечислительный ряд. «Во-первых, X. Во-вторых, Y. В-третьих, Z.» —
+  // три предложения, три дискурсивных зачина и ни одной точки с запятой.
+  // Ряд, собранный в один период, — единственное место, где русская
+  // пунктуация требует точки с запятой прямым правилом, и он же снимает два
+  // зачина из трёх. Правка не трогает ни одного слова.
+  const SERIES = {
+    ru: ["во-первых", "во-вторых", "в-третьих", "в-четвёртых", "в-четвертых", "в-пятых"],
+    en: ["first", "firstly", "second", "secondly", "third", "thirdly", "fourth", "fourthly"],
+  };
+  const SERIES_MAX_WORDS = 90;
+
+  function seriesRank(sentence, locale) {
+    const head = (sentence.match(/^\s*([\p{L}-]+)/u) || [])[1];
+    if (!head) return -1;
+    const list = SERIES[locale] || SERIES.en;
+    return list.indexOf(head.toLocaleLowerCase(locale));
+  }
+
+  function collectSeries(text, blocks, locale) {
+    const edits = [];
+    for (const block of blocks) {
+      const list = block.sentences;
+      let index = 0;
+      while (index + 1 < list.length) {
+        if (seriesRank(list[index].text, locale) < 0) { index += 1; continue; }
+        let end = index;
+        let words = countWords(list[index].text);
+        while (end + 1 < list.length) {
+          const next = seriesRank(list[end + 1].text, locale);
+          if (next < 0 || next <= seriesRank(list[end].text, locale)) break;
+          if (words + countWords(list[end + 1].text) > SERIES_MAX_WORDS) break;
+          words += countWords(list[end + 1].text);
+          end += 1;
+        }
+        for (let step = index; step < end; step += 1) {
+          const right = list[step + 1];
+          const head = (right.text.match(/^\s*([\p{L}-]+)/u) || [])[1];
+          if (!head) continue;
+          const dot = text.lastIndexOf(".", right.start);
+          const headAt = text.indexOf(head, right.start);
+          if (dot < list[step].start || dot < 0 || headAt < 0) continue;
+          edits.push(makeEdit({
+            source: text, pass: "period", method: 24,
+            start: dot, end: headAt + head.length,
+            after: `; ${head.toLocaleLowerCase(locale)}`,
+            reason: "перечислительный ряд собирается в один период через точку с запятой",
+            confidence: "high",
+            createsLong: words >= MERGE_TARGET_WORDS,
+          }));
+        }
+        index = end + 1;
+      }
+    }
+    return edits;
+  }
+
+  // Сколько длинных периодов текст выдерживает. Цель — человеческая медиана
+  // по корпусу: 0.089 доли предложений в русском, 0.22 в английском. Без
+  // потолка пасс сливает всё, до чего дотянется, и метрика уходит в перелёт —
+  // ровный ритм из длинных периодов ничем не лучше ровного из коротких.
+  const LONG_TARGET = { ru: 0.089, en: 0.22 };
+
+  function budgetPeriods(edits, blocks, locale) {
+    const lengths = [];
+    for (const block of blocks) for (const item of block.sentences) lengths.push(countWords(item.text));
+    if (!lengths.length) return edits;
+    const already = lengths.filter((value) => value >= MERGE_TARGET_WORDS).length;
+    const target = LONG_TARGET[locale] === undefined ? LONG_TARGET.en : LONG_TARGET[locale];
+    let budget = Math.max(1, Math.round(target * lengths.length) - already);
+    return edits.map((edit) => {
+      if (edit.pass !== "period" || edit.confidence !== "high") return edit;
+      if (!edit.createsLong) return edit;
+      if (budget > 0) { budget -= 1; return edit; }
+      return Object.assign({}, edit, { confidence: "medium" });
+    });
+  }
+
+  function collectPeriods(text, blocks, locale) {
+    const guard = loadAnchorGuard();
+    const edits = [];
+    for (const block of blocks) {
+      const list = block.sentences;
+      // Абзац из двух предложений сливается только в полноценный период: в
+      // остальных случаях от абзаца остаётся одна фраза, и это уже не ритм,
+      // а обрубок.
+      if (list.length < 2) continue;
+      const twoOnly = list.length === 2;
+      // Берётся самая длинная подходящая пара абзаца, а не первая попавшаяся:
+      // до тридцати пяти слов дотягивает далеко не всякая, и выбор по порядку
+      // почти всегда промахивался мимо единственной годной.
+      let best = -1;
+      let bestWords = 0;
+      for (let index = 0; index + 1 < list.length; index += 1) {
+        const total = countWords(list[index].text) + countWords(list[index + 1].text);
+        if (countWords(list[index].text) < MERGE_MIN_WORDS) continue;
+        if (countWords(list[index + 1].text) < MERGE_MIN_WORDS) continue;
+        if (total <= bestWords) continue;
+        best = index;
+        bestWords = total;
+      }
+      if (best < 0) continue;
+      if (bestWords < (twoOnly ? MERGE_TARGET_WORDS : MERGE_SOFT_WORDS)) continue;
+      for (let index = best; index === best; index += 1) {
+        const left = list[index];
+        const right = list[index + 1];
+        const leftWords = countWords(left.text);
+        const rightWords = countWords(right.text);
+        if (!/\.["»”']?$/u.test(left.text.trim())) continue;
+        const head = (right.text.match(/^\s*([\p{L}\p{N}][\p{L}\p{N}'’-]*)/u) || [])[1];
+        if (!head) continue;
+        const lower = head.toLocaleLowerCase(locale);
+        if (guard && guard.extractAnchors(head).length) continue;
+        if (!safeToLowercase(text, head, locale)) continue;
+        const dot = text.lastIndexOf(".", right.start);
+        if (dot < left.start || dot < 0) continue;
+        const headAt = text.indexOf(head, right.start);
+        if (headAt < 0) continue;
+        edits.push(makeEdit({
+          source: text, pass: "period", method: 24,
+          start: dot, end: headAt + head.length,
+          after: `; ${lower}`,
+          reason: "два коротких предложения подряд — живой текст свёл бы их в один период",
+          confidence: leftWords + rightWords >= MERGE_TARGET_WORDS ? "high" : "medium",
+          createsLong: leftWords + rightWords >= MERGE_TARGET_WORDS,
+        }));
+        break;
+      }
+    }
+    return edits;
+  }
+
   function collectDenominalization(text, language, locale) {
     const edits = [];
     const dictionary = language === "ru" ? DENOMINALIZATION_RU : DENOMINALIZATION_EN;
@@ -466,10 +799,53 @@
         }));
       }
     }
+    if (language !== "ru") {
+      for (const [noun, gerund] of GERUND_EN) {
+        const pattern = new RegExp(`${GERUND_LEFT}${EDGE_LEFT}the${SPACE}+${noun}${SPACE}+of${EDGE_RIGHT}`, "giu");
+        for (const match of String(text).matchAll(pattern)) {
+          const head = match[0][0];
+          const isCapital = head === head.toLocaleUpperCase(locale) && head !== head.toLocaleLowerCase(locale);
+          edits.push(makeEdit({
+            source: text, pass: "denominalization", method: 22,
+            start: match.index, end: match.index + match[0].length,
+            after: isCapital ? capitalize(gerund, locale) : gerund,
+            reason: "существительное разворачивается в действие",
+            confidence: "high",
+          }));
+        }
+      }
+    }
     return edits;
   }
 
   /** Места номинализации, которые нельзя переписать без разбора падежей. */
+  // Триада «X, Y и Z» (M40). Автоматической правки здесь нет и быть не может:
+  // всё, что уберёт признак, либо выбросит один из трёх членов, либо
+  // перестроит фразу — то и другое меняет содержание, а не форму. Признак
+  // английский: у машины он в каждом пятом предложении при человеческой
+  // медиане 0.12; в русском корпусе разницы нет, поэтому и подсказки нет.
+  const TRIAD_MANUAL = /[^,;:()]{3,},[^,;:()]{3,},\s*(?:and|or)\s+[^,.;:()]{3,}/giu;
+  // Подсказка появляется только когда триад в тексте много: одна — обычная
+  // фраза, три подряд — приём.
+  const TRIAD_MANUAL_MIN = 3;
+
+  function collectTriads(text, language) {
+    if (language === "ru") return [];
+    const found = [];
+    for (const match of String(text).matchAll(TRIAD_MANUAL)) {
+      found.push({
+        id: `manual-triad-${match.index}`,
+        method: 40,
+        start: match.index,
+        end: match.index + match[0].length,
+        fragment: match[0],
+        context: String(text).slice(Math.max(0, match.index - 30), match.index + match[0].length + 40).trim(),
+        advice: "перечисление ровно из трёх — заметный след генерации: сделайте один из членов отдельной фразой или уберите тот, что не несёт своего",
+      });
+    }
+    return found.length >= TRIAD_MANUAL_MIN ? found : [];
+  }
+
   function collectManual(text, language) {
     const patterns = language === "ru" ? MANUAL_NOMINALIZATION_RU : MANUAL_NOMINALIZATION_EN;
     const found = [];
@@ -486,7 +862,7 @@
         });
       }
     }
-    return found.sort((left, right) => left.start - right.start);
+    return [...found, ...collectTriads(text, language)].sort((left, right) => left.start - right.start);
   }
 
   /** Правки не должны пересекаться; удаление целого предложения важнее правок внутри него. */
@@ -600,6 +976,12 @@
       ...collectConnectives(source, sentences, language),
       ...collectRhythm(source, sentences, language),
       ...collectDenominalization(source, language, locale),
+      ...collectPunctuation(source, language),
+      ...budgetPeriods(
+        [...collectSeries(source, sentences, locale), ...collectPeriods(source, sentences, locale)],
+        sentences,
+        locale,
+      ),
     ];
     const edits = recommend(resolve(raw), { sentenceCount, discourseZone: settings.discourseZone });
 

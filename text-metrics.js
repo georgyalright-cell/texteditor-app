@@ -137,8 +137,8 @@
       // граница по якорям поэтому требовательна намеренно: она показывает
       // автору, насколько его текст беднее фактами, чем настоящий отчёт.
       calibration: {
-        en: { texts: 127, metrics: 12 },
-        ru: { texts: 159, metrics: 12 },
+        en: { texts: 127, metrics: 15 },
+        ru: { texts: 159, metrics: 15 },
       },
       zonesByLanguage: {
         // Русские нормы измерены отдельно: 159 фрагментов из ста статей десяти
@@ -161,10 +161,23 @@
           hedgeDensity: { max: 0.68, overshoot: 0.93 },
           nominalizationDensity: { max: 4.35, overshoot: 5.37 },
           paragraphCv: { min: 0.66, max: 1.28, overshoot: 1.55 },
-          openerRepeat: { max: 0.295, overshoot: 0.409 },
-          ngramRepeat: { max: 0.184, overshoot: 0.25 },
+          openerRepeat: { min: 0.037, max: 0.295, overshoot: 0.409 },
+          ngramRepeat: { min: 0.006, max: 0.184, overshoot: 0.25 },
           abstractShare: { max: 0.042, overshoot: 0.054 },
           dashShare: { max: 0.147, overshoot: 0.219 },
+          // Нижние границы и три метрики ниже измерены на повторной выемке
+          // корпуса — 123 фрагмента для русского, 54 для английского. Верхние
+          // границы двенадцати прежних метрик оставлены от первой калибровки,
+          // где текстов было больше; повторная выемка воспроизвела их с
+          // точностью до сотых, и заменять большую выборку меньшей незачем.
+          //
+          // Пол у повтора зачинов и лексики — исправление, а не добавка. У
+          // метрик был только потолок, и машинный ноль лежал внутри зоны,
+          // читаясь как «хорошо». Живой автор долбит один термин: медиана
+          // повтора лексики 0.054 в русском и 0.21 в английском, у машины 0.
+          punctInventory: { min: 0.22, max: 0.93, overshoot: 1.4 },
+          longSentences: { min: 0.029, max: 0.161, overshoot: 0.213 },
+          triadShare: { max: 0.066, overshoot: 0.119 },
         },
         en: {
           anchorDensity: { min: 5.25, max: 24.94, overshoot: 29.19 },
@@ -175,10 +188,13 @@
           hedgeDensity: { max: 0.27, overshoot: 0.61 },
           nominalizationDensity: { max: 9.83, overshoot: 11.37 },
           paragraphCv: { min: 0.86, max: 1.85, overshoot: 2.37 },
-          openerRepeat: { max: 0.536, overshoot: 0.628 },
-          ngramRepeat: { max: 0.444, overshoot: 0.541 },
+          openerRepeat: { min: 0.162, max: 0.536, overshoot: 0.628 },
+          ngramRepeat: { min: 0.111, max: 0.444, overshoot: 0.541 },
           abstractShare: { max: 0.067, overshoot: 0.088 },
           dashShare: { max: 0.033, overshoot: 0.065 },
+          punctInventory: { min: 0.15, max: 0.89, overshoot: 1.28 },
+          longSentences: { min: 0.117, max: 0.327, overshoot: 0.468 },
+          triadShare: { max: 0.207, overshoot: 0.331 },
         },
       },
       zones: {
@@ -190,10 +206,13 @@
         hedgeDensity: { max: 2, overshoot: 5 },
         nominalizationDensity: { max: 9, overshoot: 18 },
         paragraphCv: { min: 0.25, max: 0.9, overshoot: 1.3 },
-        openerRepeat: { max: 0.3, overshoot: 0.6 },
-        ngramRepeat: { max: 0.06, overshoot: 0.15 },
+        openerRepeat: { min: 0.1, max: 0.3, overshoot: 0.6 },
+        ngramRepeat: { min: 0.01, max: 0.06, overshoot: 0.15 },
         abstractShare: { max: 0.08, overshoot: 0.15 },
         dashShare: { max: 0.35, overshoot: 0.5 },
+        punctInventory: { min: 0.15, max: 2.5, overshoot: 4 },
+        longSentences: { min: 0.02, max: 0.35, overshoot: 0.5 },
+        triadShare: { max: 0.2, overshoot: 0.35 },
         emptyClaims: { max: 0.3, overshoot: 0.6 },
       },
     },
@@ -210,10 +229,13 @@
         hedgeDensity: { max: 2, overshoot: 5 },
         nominalizationDensity: { max: 8, overshoot: 18 },
         paragraphCv: { min: 0.3, max: 1, overshoot: 1.4 },
-        openerRepeat: { max: 0.3, overshoot: 0.6 },
-        ngramRepeat: { max: 0.06, overshoot: 0.15 },
+        openerRepeat: { min: 0.1, max: 0.3, overshoot: 0.6 },
+        ngramRepeat: { min: 0.01, max: 0.06, overshoot: 0.15 },
         abstractShare: { max: 0.08, overshoot: 0.15 },
         dashShare: { max: 0.35, overshoot: 0.5 },
+        punctInventory: { min: 0.15, max: 2.5, overshoot: 4 },
+        longSentences: { min: 0.02, max: 0.35, overshoot: 0.5 },
+        triadShare: { max: 0.2, overshoot: 0.35 },
         emptyClaims: { max: 0.2, overshoot: 0.45 },
       },
     },
@@ -230,10 +252,13 @@
         hedgeDensity: { max: 2.5, overshoot: 6 },
         nominalizationDensity: { max: 7, overshoot: 16 },
         paragraphCv: { min: 0.3, max: 1.1, overshoot: 1.5 },
-        openerRepeat: { max: 0.35, overshoot: 0.6 },
-        ngramRepeat: { max: 0.07, overshoot: 0.16 },
+        openerRepeat: { min: 0.1, max: 0.35, overshoot: 0.6 },
+        ngramRepeat: { min: 0.01, max: 0.07, overshoot: 0.16 },
         abstractShare: { max: 0.07, overshoot: 0.14 },
         dashShare: { max: 0.4, overshoot: 0.55 },
+        punctInventory: { min: 0.2, max: 3, overshoot: 4.5 },
+        longSentences: { min: 0, max: 0.2, overshoot: 0.35 },
+        triadShare: { max: 0.25, overshoot: 0.4 },
         emptyClaims: { max: 0.2, overshoot: 0.45 },
       },
     },
@@ -250,10 +275,13 @@
         hedgeDensity: { max: 1, overshoot: 3 },
         nominalizationDensity: { max: 6, overshoot: 14 },
         paragraphCv: { min: 0.3, max: 1.2, overshoot: 1.6 },
-        openerRepeat: { max: 0.3, overshoot: 0.6 },
-        ngramRepeat: { max: 0.08, overshoot: 0.18 },
+        openerRepeat: { min: 0.1, max: 0.3, overshoot: 0.6 },
+        ngramRepeat: { min: 0.01, max: 0.08, overshoot: 0.18 },
         abstractShare: { max: 0.06, overshoot: 0.12 },
         dashShare: { max: 0.4, overshoot: 0.55 },
+        punctInventory: { min: 0.2, max: 3, overshoot: 4.5 },
+        longSentences: { min: 0, max: 0.2, overshoot: 0.35 },
+        triadShare: { max: 0.25, overshoot: 0.4 },
         emptyClaims: { max: 0.15, overshoot: 0.4 },
       },
     },
@@ -450,6 +478,64 @@
     };
   }
 
+  /**
+   * Инвентарь знаков (M38). Считается всё, кроме запятой, точки и тире:
+   * двоеточие, точка с запятой, скобки, вопрос, восклицание, кавычки.
+   *
+   * Это измерено, а не предположено: у живой академической прозы медиана
+   * 0.77 знака на предложение в русском и 0.64 в английском, а у машинного
+   * текста ровно ноль — сразу по всем видам знаков. Генерация обходится
+   * запятой и точкой, потому что остальные знаки требуют решения о том,
+   * что в предложении главное, а что попутное. Метрике нужен пол, а не
+   * потолок: избыток скобок — вопрос вкуса, их отсутствие — след машины.
+   */
+  function punctuationInventory(text, sentenceCount) {
+    const source = String(text).replace(/\d\s*[—–-]\s*\d/gu, "");
+    const counts = {
+      colon: countMatches(source, /:/g),
+      semicolon: countMatches(source, /;/g),
+      parenthesis: countMatches(source, /\(/g),
+      question: countMatches(source, /\?/g),
+      exclamation: countMatches(source, /!/g),
+      quote: Math.floor(countMatches(source, /[«»"“”]/gu) / 2),
+    };
+    const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
+    return { counts, total, perSentence: sentenceCount ? total / sentenceCount : 0 };
+  }
+
+  /**
+   * Длинный период (M39). Доля предложений от тридцати пяти слов.
+   *
+   * Разброс длин этого не ловит: чередование двенадцати и двадцати слов даёт
+   * приличный CV, ни разу не выйдя за тридцать. У живого корпуса самое
+   * длинное предложение фрагмента — 71 слово в русском и 96 в английском по
+   * медиане; у машинного текста 25 и 27, то есть длинного периода нет вовсе.
+   */
+  const LONG_SENTENCE_WORDS = 35;
+
+  function longSentenceShare(sentenceLengths) {
+    if (!sentenceLengths.length) return { share: 0, longest: 0 };
+    const long = sentenceLengths.filter((value) => value >= LONG_SENTENCE_WORDS);
+    return { share: long.length / sentenceLengths.length, longest: Math.max(...sentenceLengths) };
+  }
+
+  /**
+   * Триада (M40). Перечисление ровно из трёх однородных членов — «X, Y и Z».
+   * Признак английский: там машина ставит её в каждом пятом предложении при
+   * человеческой медиане 0.12, в русском корпусе разницы нет.
+   */
+  const TRIAD_RE = /[^,;:()]{3,},[^,;:()]{3,},\s*(?:and|or|и|или|а также)\s/giu;
+
+  function triadShare(sentenceList) {
+    if (!sentenceList.length) return { share: 0, samples: [] };
+    const samples = [];
+    for (const sentence of sentenceList) {
+      TRIAD_RE.lastIndex = 0;
+      if (TRIAD_RE.test(sentence)) samples.push(sentence.slice(0, 90));
+    }
+    return { share: samples.length / sentenceList.length, samples: samples.slice(0, 4) };
+  }
+
   /** Пунктуация кроме точки: следим, чтобы всё не шло через длинное тире (D29). */
   function punctuationMix(text) {
     const source = String(text).replace(/\d\s*[—–]\s*\d/gu, "");
@@ -549,6 +635,9 @@
     const abstract = countMatches(source, set.abstract);
     const abstractShare = wordList.length ? abstract / wordList.length : 0;
     const punctuation = punctuationMix(source);
+    const inventory = punctuationInventory(source, sentenceList.length);
+    const longSentences = longSentenceShare(sentenceLengths);
+    const triads = triadShare(sentenceList);
 
     const claimSentences = sentenceList.filter((sentence) => set.claim.test(sentence));
     // Имена собственные здесь не считаются якорем: «KPIs» — это категория, а
@@ -682,8 +771,8 @@
         kind: "percent",
         zone: zones.openerRepeat,
         zoneLabel: zoneLabel(zones.openerRepeat, "percent"),
-        direction: "down",
-        status: evaluate(openerRepeat.share, zones.openerRepeat, "down"),
+        direction: "band",
+        status: evaluate(openerRepeat.share, zones.openerRepeat, "band"),
         evidence: { samples: openerRepeat.samples },
       },
       {
@@ -696,8 +785,8 @@
         kind: "percent",
         zone: zones.ngramRepeat,
         zoneLabel: zoneLabel(zones.ngramRepeat, "percent"),
-        direction: "down",
-        status: evaluate(ngram.share, zones.ngramRepeat, "down"),
+        direction: "band",
+        status: evaluate(ngram.share, zones.ngramRepeat, "band"),
         evidence: { samples: ngram.samples },
       },
       {
@@ -728,6 +817,47 @@
         status: evaluate(punctuation.dashShare, zones.dashShare, "down"),
         evidence: punctuation.counts,
       },
+      {
+        id: "punctInventory",
+        number: 38,
+        label: "Разнообразие пунктуации",
+        hint: "Двоеточия, скобки, точки с запятой, кавычки на предложение. У машинного текста их ноль.",
+        value: inventory.perSentence,
+        display: formatNumber(inventory.perSentence, 2),
+        zone: zones.punctInventory,
+        zoneLabel: zoneLabel(zones.punctInventory),
+        direction: "band",
+        status: evaluate(inventory.perSentence, zones.punctInventory, "band"),
+        evidence: inventory.counts,
+      },
+      {
+        id: "longSentences",
+        number: 39,
+        label: "Длинные периоды",
+        hint: "Доля предложений от 35 слов. Разброс длин их не требует, а живой текст их пишет.",
+        value: longSentences.share,
+        display: formatPercent(longSentences.share),
+        kind: "percent",
+        zone: zones.longSentences,
+        zoneLabel: zoneLabel(zones.longSentences, "percent"),
+        direction: "band",
+        status: evaluate(longSentences.share, zones.longSentences, "band"),
+        evidence: { longest: longSentences.longest, threshold: LONG_SENTENCE_WORDS },
+      },
+      {
+        id: "triadShare",
+        number: 40,
+        label: "Перечисления из трёх",
+        hint: "«X, Y и Z» в каждом предложении подряд — заметный след генерации в английском.",
+        value: triads.share,
+        display: formatPercent(triads.share),
+        kind: "percent",
+        zone: zones.triadShare,
+        zoneLabel: zoneLabel(zones.triadShare, "percent"),
+        direction: "down",
+        status: evaluate(triads.share, zones.triadShare, "down"),
+        evidence: { samples: triads.samples },
+      },
     ];
 
     // Зоны измерены на фрагментах от четырёхсот слов. Применять их к тексту
@@ -741,6 +871,9 @@
       "paragraphCv",
       "openerRepeat",
       "ngramRepeat",
+      "punctInventory",
+      "longSentences",
+      "triadShare",
     ]);
     const enoughMaterial = wordList.length >= 120 && sentenceList.length >= 5;
     if (!enoughMaterial) {

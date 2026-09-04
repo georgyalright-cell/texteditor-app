@@ -25,7 +25,21 @@
   //
   // Прежняя плоская двенадцатка была мягкой для обоих языков: цикл
   // останавливался, не дойдя до типичной человеческой прозы.
-  const DEFAULT_TARGET = { ru: 4, en: 7 };
+  //
+  // После того как в оценку вошла плоская поверхность, медианы пересчитаны:
+  // русская упала до нуля, английская до пяти, а машинный текст поднялся с
+  // одиннадцати до двадцати четырёх. Ноль здесь не значит «чище людей» —
+  // оценка штрафует только превышение свободной нормы, и живой текст его
+  // просто не даёт.
+  const DEFAULT_TARGET = { ru: 0, en: 5 };
+  // Порог, ниже которого молчать честно. Цель — медиана, но не дойти до
+  // медианы и остаться заметно машинным — разные вещи, и предупреждение
+  // должно срабатывать на второе. Это третий квартиль тех же корпусов.
+  const QUIET_BELOW = { ru: 5, en: 13 };
+
+  function quietBelow(language) {
+    return QUIET_BELOW[language] === undefined ? QUIET_BELOW.en : QUIET_BELOW[language];
+  }
 
   function targetFor(language) {
     return DEFAULT_TARGET[language] === undefined ? DEFAULT_TARGET.en : DEFAULT_TARGET[language];
@@ -43,6 +57,7 @@
     cliche: "cliche",
     antithesis: "antithesis",
     openers: "openerRepeat",
+    flatness: "flatness",
     discourse: "discourse",
     hedge: "hedge",
     paragraphs: "paragraphs",
@@ -54,6 +69,7 @@
     cliche: "шаблонные обороты",
     antithesis: "антитезы",
     openers: "однообразные зачины",
+    flatness: "плоская пунктуация и ритм",
     discourse: "связки в начале предложения",
     hedge: "хеджи",
     paragraphs: "ровные абзацы",
@@ -158,8 +174,8 @@
    */
   function nextAction(result, budgets) {
     const weighted =
-      0.28 * result.emDash + 0.24 * result.burstiness + 0.18 * result.cliche +
-      0.11 * result.discourse + 0.09 * result.openerRepeat + 0.07 * result.hedge +
+      0.26 * result.emDash + 0.22 * result.burstiness + 0.16 * result.cliche +
+      0.14 * result.flatness + 0.10 * result.discourse + 0.06 * result.hedge +
       0.06 * result.paragraphs;
     // Антитеза не усредняется, а поднимает итог снизу. Пока итог держат другие
     // сигналы, её правка не сдвинет оценку и шаг выглядел бы бесполезным,
@@ -170,12 +186,12 @@
       : (result.antithesis > weighted ? result.antithesis + 1000 : 0.5);
     return [
       { id: "antithesis", weight: antithesis },
-      { id: "dash", weight: 0.28 * result.emDash },
-      { id: "rhythm", weight: 0.24 * result.burstiness },
-      { id: "cliche", weight: 0.18 * result.cliche },
-      { id: "discourse", weight: 0.12 * result.discourse },
-      { id: "openers", weight: 0.1 * result.openerRepeat },
-      { id: "hedge", weight: 0.07 * result.hedge },
+      { id: "dash", weight: 0.26 * result.emDash },
+      { id: "rhythm", weight: 0.22 * result.burstiness },
+      { id: "cliche", weight: 0.16 * result.cliche },
+      { id: "flatness", weight: 0.14 * result.flatness },
+      { id: "discourse", weight: 0.11 * result.discourse },
+      { id: "hedge", weight: 0.06 * result.hedge },
       { id: "paragraphs", weight: 0.06 * result.paragraphs },
     ]
       .filter((item) => item.weight > 0 && budgets[item.id] > 0)
@@ -183,7 +199,14 @@
       .map((item) => item.id)[0] || null;
   }
 
-  const PASS_ACTIONS = { discourse: ["connectives", "reduction"], hedge: ["reduction"] };
+  // Плоскую поверхность лечат два пасса: длинный период даёт и точку с
+  // запятой, и предложение от тридцати пяти слов, а инвентарь пунктуации
+  // добирает двоеточие и скобки там, где уточнение уже стоит в тексте.
+  const PASS_ACTIONS = {
+    discourse: ["connectives", "reduction"],
+    hedge: ["reduction"],
+    flatness: ["period", "punctuation"],
+  };
 
   function applyAction(id, text, language, deps) {
     if (PASS_ACTIONS[id]) {
@@ -230,6 +253,7 @@
       cliche: ACTION_BUDGET,
       antithesis: ACTION_BUDGET,
       openers: ACTION_BUDGET,
+      flatness: ACTION_BUDGET,
       discourse: ACTION_BUDGET,
       hedge: ACTION_BUDGET,
       paragraphs: 1,
@@ -321,5 +345,5 @@
       `${accepted.length === 1 ? "раунд" : accepted.length < 5 ? "раунда" : "раундов"} (${steps.join("; ")}).`;
   }
 
-  return { humanize, describeRounds, integrityIssues, targetFor, DEFAULT_TARGET, ACTION_LABELS };
+  return { humanize, describeRounds, integrityIssues, targetFor, quietBelow, DEFAULT_TARGET, ACTION_LABELS };
 });

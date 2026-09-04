@@ -246,6 +246,38 @@
     return Math.min(100, Math.round(Math.max(0, density - allowanceFor(set.locale).hedge) * 35));
   }
 
+  // Плоская поверхность (M38/M39). Два измерения, у которых машинный текст
+  // стоит ровно на нуле, а живой — заметно выше: инвентарь знаков и длинный
+  // период.
+  //
+  // Здесь важен пол, а не потолок, и это отличает признак от остальных семи.
+  // Генерация обходится запятой и точкой — двоеточий, скобок и точек с
+  // запятой у неё ноль сразу по всем видам, при человеческой медиане 0.77
+  // знака на предложение в русском и 0.64 в английском. Длинного периода у
+  // неё тоже нет: самое длинное предложение фрагмента — 25 слов против
+  // человеческих 71 и 96.
+  //
+  // Пороги — десятый процентиль тех же корпусов, что и зоны отчёта.
+  const FLATNESS_FLOOR = {
+    ru: { punctuation: 0.22, long: 0.029 },
+    en: { punctuation: 0.15, long: 0.117 },
+  };
+  const LONG_SENTENCE_WORDS = 35;
+
+  function flatnessScore(text, sentenceList, locale) {
+    if (sentenceList.length < 4) return 0;
+    const floor = FLATNESS_FLOOR[locale] || FLATNESS_FLOOR.en;
+    const source = String(text).replace(/\d\s*[—–-]\s*\d/gu, "");
+    const marks = (source.match(/[:;()?!]/g) || []).length
+      + Math.floor((source.match(/[«»"“”]/gu) || []).length / 2);
+    const perSentence = marks / sentenceList.length;
+    const longShare =
+      sentenceList.filter((item) => countWords(item) >= LONG_SENTENCE_WORDS).length / sentenceList.length;
+    const punctGap = Math.max(0, floor.punctuation - perSentence) / floor.punctuation;
+    const longGap = Math.max(0, floor.long - longShare) / floor.long;
+    return Math.min(100, Math.round(50 * punctGap + 50 * longGap));
+  }
+
   // Ровные абзацы — след нарезки по линейке. Считается только там, где
   // выбор вообще был: меньше трёх абзацев или короткие абзацы ничего не
   // говорят об авторе.
@@ -278,10 +310,17 @@
     const openerRepeat = openerRepeatScore(sentenceList, set);
     const hedge = hedgeScore(lowered, countWords(source), set);
     const paragraphs = paragraphScore(source);
+    const flatness = flatnessScore(source, sentenceList, set.locale);
 
+    // Повтор зачинов из весов убран, а не забыт. По корпусам он равен нулю и
+    // у живого текста, и у машинного: свободная норма (девятый дециль) выше
+    // того, что встречается в обоих, поэтому девять процентов веса не решали
+    // ничего. Его место занял признак, который различает: плоская
+    // поверхность. Метрикой в панели повтор зачинов остался — там у него
+    // теперь есть пол, и машинный ноль наконец читается как отклонение.
     let score = Math.round(
-      0.28 * emDash + 0.24 * burstiness + 0.18 * cliche +
-        0.11 * discourse + 0.09 * openerRepeat + 0.07 * hedge + 0.06 * paragraphs,
+      0.26 * emDash + 0.22 * burstiness + 0.16 * cliche + 0.14 * flatness +
+        0.10 * discourse + 0.06 * hedge + 0.06 * paragraphs,
     );
     if (antithesis > 0) score = Math.max(score, antithesis);
 
@@ -291,6 +330,7 @@
       burstiness,
       cliche,
       antithesis,
+      flatness,
       discourse,
       openerRepeat,
       hedge,

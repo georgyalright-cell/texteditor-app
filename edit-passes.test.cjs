@@ -134,3 +134,96 @@ test("замена, требующая смены падежа, в словар�
   const { result } = applyAll(source);
   assert.match(result.text, /проводит анализ рынка/);
 });
+
+// ─── 23/24. Плоская поверхность ──────────────────────────────────────────
+
+test("перечислительный ряд собирается в один период через точку с запятой", () => {
+  const text =
+    "Развитие сектора сдерживается несколькими причинами, и все они известны.\n\n" +
+    "Во-первых, доступ к финансовым ресурсам остаётся ограниченным для большинства заявителей. " +
+    "Во-вторых, административная нагрузка на предприятие выросла за последние три года. " +
+    "В-третьих, предпринимательских компетенций не хватает даже опытным руководителям.";
+  const result = passes.applyPass(text, "period", { language: "ru" });
+  assert.ok(result.changed);
+  assert.match(result.text, /; во-вторых,/u);
+  assert.match(result.text, /; в-третьих,/u);
+  // Ни одного слова не убавилось и не прибавилось: правка чисто знаковая.
+  assert.equal(passes.countWords(result.text), passes.countWords(text));
+});
+
+test("слияние снимает заглавную только при доказательстве, что слово нарицательное", () => {
+  // Положительное свидетельство — то же слово со строчной буквы уже есть в
+  // тексте. Без него заглавная может оказаться значащей, и «Ozon» превратится
+  // в «ozon»: якорный гард такую правку не отклонит, имя собственное он
+  // якорем не считает намеренно.
+  const evidenced =
+    "Первый абзац говорит про замедление рынка и нужен пассу как контекст.\n\n" +
+    "Рынок рос почти весь прошедший год и уверенно держался выше прошлогодних значений сразу по всем товарным категориям без единого исключения. " +
+    "Замедление началось только в декабре и продолжалось ровно до самого конца отчётного периода, пока сезонный спрос окончательно не выдохся. " +
+    "Третье предложение здесь стоит для того, чтобы абзац не оказался из двух фраз.";
+  const merged = passes.applyPass(evidenced, "period", { language: "ru" });
+  assert.ok(merged.changed);
+  assert.match(merged.text, /; замедление/u);
+
+  const named =
+    "Первый абзац говорит про замедление рынка и нужен пассу как контекст.\n\n" +
+    "Рынок рос почти весь прошедший год и уверенно держался выше прошлогодних значений сразу по всем товарным категориям без единого исключения. " +
+    "Ozon замедлился только в декабре и оставался в минусе ровно до самого конца отчётного периода, пока сезонный спрос окончательно не выдохся. " +
+    "Третье предложение здесь стоит для того, чтобы абзац не оказался из двух фраз.";
+  assert.doesNotMatch(passes.applyPass(named, "period", { language: "ru" }).text, /; ozon/u);
+});
+
+test("длинных периодов делается не больше человеческой нормы", () => {
+  // Без потолка пасс сливает всё, до чего дотянется, и ровный ритм из
+  // коротких фраз меняется на ровный ритм из длинных.
+  const paragraph = [
+    "Первое предложение абзаца достаточно длинное, чтобы пройти нижний порог слияния по объёму.",
+    "Второе предложение абзаца тоже достаточно длинное, чтобы пройти нижний порог слияния.",
+    "Третье предложение абзаца снова длинное и снова проходит нижний порог слияния по объёму.",
+    "Четвёртое предложение абзаца длинное и проходит нижний порог слияния точно так же.",
+  ].join(" ");
+  const text = [paragraph, paragraph, paragraph, paragraph].join("\n\n");
+  const proposal = passes.propose(text, { language: "ru" });
+  const high = proposal.edits.filter((edit) => edit.pass === "period" && edit.confidence === "high");
+  const sentences = passes.sentenceSpans(text, 0).length;
+  assert.ok(high.length <= Math.max(1, Math.round(0.089 * 16) ) + 1, `слияний ${high.length}`);
+  assert.ok(sentences >= 0);
+});
+
+test("попутное уточнение уходит в скобки, а пояснение — за двоеточие", () => {
+  const text = "Рынок вырос на 12%, а именно за счёт готовой еды, и это заметно.";
+  const result = passes.applyPass(text, "punctuation", { language: "ru" });
+  assert.match(result.text, /12%: за счёт готовой еды/u);
+
+  const aside = "Некоторые категории, например, готовая еда, выросли сильнее прочих в 2024 году.";
+  const parens = passes.applyPass(aside, "punctuation", { language: "ru" });
+  assert.match(parens.text, /\(например, готовая еда\)/u);
+});
+
+test("англоязычная номинализация разворачивается, но не после предлога", () => {
+  const plain = "The implementation of the plan reduced costs by 12% in 2024.";
+  assert.match(passes.applyPass(plain, "denominalization", { language: "en" }).text, /^Implementing the plan/u);
+
+  const afterPreposition = "Costs fell by 12% during the implementation of the plan in 2024.";
+  assert.doesNotMatch(
+    passes.applyPass(afterPreposition, "denominalization", { language: "en" }).text,
+    /during implementing/u,
+  );
+});
+
+test("триады показываются автору пачкой, а не правятся сами", () => {
+  const text = [
+    "The process comprises identification, assessment, and monitoring of risk.",
+    "Teams rely on documentation, review, and escalation to keep the register current.",
+    "Benefits include lower cost, faster delivery, and clearer ownership across the group.",
+  ].join(" ");
+  const proposal = passes.propose(text, { language: "en" });
+  const triads = proposal.manual.filter((item) => item.method === 40);
+  assert.equal(triads.length, 3);
+  // Ни одной автоматической правки: убрать триаду можно только выбросив один
+  // из трёх членов, а это содержание, а не форма.
+  assert.equal(proposal.edits.filter((edit) => edit.method === 40).length, 0);
+
+  const single = "Benefits include lower cost, faster delivery, and clearer ownership across the group.";
+  assert.equal(passes.propose(single, { language: "en" }).manual.filter((item) => item.method === 40).length, 0);
+});
