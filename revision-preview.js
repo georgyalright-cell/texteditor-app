@@ -21,6 +21,10 @@
       const after = document.createElement("p"); after.textContent = detail.after;
       before.className = "revision-before"; after.className = "revision-after";
       row.append(label, before, after); list.appendChild(row);
+      const measures = [];
+      if (Number.isFinite(detail.semanticSimilarity)) measures.push(`Сходство эмбеддингов: ${detail.semanticSimilarity.toFixed(3)}`);
+      if (detail.neural) measures.push(`Перплексия: ${detail.neural.before.perplexity.toFixed(1)} → ${detail.neural.after.perplexity.toFixed(1)}`);
+      if (measures.length) { const info = document.createElement("p"); info.className = "revision-before"; info.textContent = measures.join(" · ") + ". Не оценка авторства."; row.appendChild(info); }
     }
     note.textContent = "Отметьте подходящие варианты. Сравнение смысла — фильтр похожести, а не проверка фактов. Проверьте действующих лиц, причинность и грамматику; до применения документ не меняется.";
     apply.disabled = true; box.hidden = false;

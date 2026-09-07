@@ -108,7 +108,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker("neural-worker.js?v=39");
+    worker = new Worker("neural-worker.js?v=40");
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "progress") {
@@ -116,7 +116,7 @@
         return;
       }
       if (message.type === "ready") {
-        modelsWarm = true;
+        modelsWarm = message.fullPair !== false;
         setStatus(message.message, false);
         return;
       }
@@ -127,7 +127,7 @@
         pending.delete(message.id);
         elements.progress.hidden = true;
         if (message.type === "scores") {
-          modelsWarm = true;
+          modelsWarm = message.fullPair !== false;
           waiting.resolve(message.scores || []);
         }
         else if (message.type === "error") waiting.reject(new Error(message.message || "Оценка не выполнена."));
@@ -179,7 +179,7 @@
   }
 
   elements.button.addEventListener("click", () => {
-    if (busy || !texts.result || !supported()) return;
+    if (busy || lockedForPolish || !texts.result || !supported()) return;
     resetResult();
     setBusy(true);
     requestId += 1;
@@ -189,28 +189,40 @@
 
   /**
    * Оценить несколько версий текста локальной моделью.
-   * Возвращает значения Binoculars: чем БОЛЬШЕ, тем человечнее. Отбор
-   * кандидатов ждёт обратного соглашения и переворачивает знак сам —
-   * держать оба соглашения в одном месте было бы источником ошибок.
+   * Совместимый диагностический API: возвращает значения Binoculars.
+   * У этой пары моделей нет проверенного порога авторства. Глубокая
+   * редакция использует scoreDetails и полный log-PPL, не этот адаптер.
    */
   function scoreTexts(texts) {
+    return scoreDetails(texts).then((scores) => scores.map((item) => item && Number.isFinite(item.binoculars) ? item.binoculars : NaN));
+  }
+
+  function scoreDetails(texts, options) {
     const list = (texts || []).map((item) => String(item || ""));
     if (!list.length) return Promise.resolve([]);
     if (!supported()) return Promise.reject(new Error("WebGPU недоступен."));
+    if (list.length > 32) return Promise.reject(new Error("Слишком много вариантов для одного нейропрохода."));
     selectionId += 1;
     const id = selectionId;
     return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
-      ensureWorker().postMessage({ type: "scoreMany", id, texts: list });
-    }).then((scores) => scores.map((item) => Number(item && item.binoculars)));
+      const timer = setTimeout(() => {
+        const error = new Error("Истекло время нейрооценки.");
+        if (worker) worker.terminate(); worker = null; modelsWarm = false;
+        for (const waiting of pending.values()) waiting.reject(error);
+        pending.clear();
+      }, 6 * 60 * 1000);
+      pending.set(id, { resolve: (value) => { clearTimeout(timer); resolve(value); }, reject: (error) => { clearTimeout(timer); reject(error); } });
+      try { ensureWorker().postMessage({ type: "scoreMany", id, texts: list, fullText: Boolean(options && options.fullText), perplexityOnly: Boolean(options && options.perplexityOnly) }); }
+      catch (error) { clearTimeout(timer); pending.delete(id); reject(error); }
+    });
   }
 
   root.NeuralScorerUI = {
     setTexts,
     supported,
     scoreTexts,
-    // Загружены ли модели. Ранжирование перплексией опирается на это: само
-    // оно загрузку не начинает.
+    scoreDetails,
+    // Состояние кэша для совместимых интеграций; scoreDetails умеет загрузку.
     warm: () => modelsWarm,
     reportProgress,
     lockForPolish,

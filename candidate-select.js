@@ -13,13 +13,12 @@
   //
   // Здесь появляется второй шаг: собрать несколько допустимых версий одного
   // текста и выбрать из них по оценке. Оценка подключаемая — в этом весь
-  // смысл. По умолчанию это детерминированная оценка машинности, а когда
-  // доступна локальная модель, ту же роль играет перплексия: тогда цикл
-  // оптимизирует ровно то, что меряет детектор, а не его косвенные признаки.
+  // смысл. По умолчанию это детерминированная редакторская оценка.
+  // Глубокая редакция добавляет ограниченный штраф роста log-PPL через
+  // NeuralRanking; она не оптимизирует внешний детектор или авторство.
   //
   // Контракт оценки: score(texts) -> Promise<number[]>, где МЕНЬШЕ значит
-  // человечнее. Перплексийный адаптер обязан перевернуть знак сам —
-  // у Binoculars человечнее как раз больше.
+  // предпочтительнее для выбранного редакторского критерия, не «человечнее».
 
   function loadAnchorGuard() {
     if (typeof globalThis !== "undefined" && globalThis.AnchorGuard) return globalThis.AnchorGuard;
@@ -393,7 +392,7 @@
   }
 
   /** Пакетная оценка версий и замена тех предложений, где нашлось лучше. */
-  function scoreAndReplace(source, targets, score, guard, options, totalSentences) {
+  async function scoreAndReplace(source, targets, score, guard, options, totalSentences) {
     const settings = options || {};
     if (settings.isCancelled && settings.isCancelled()) return Promise.reject(new Error("Редактура остановлена."));
     const generatorWarnings = [...new Set(targets.map((target) => target.generatorWarning).filter(Boolean))];
@@ -401,11 +400,21 @@
     // Один пакет на всё: оригиналы и версии подряд, границы запоминаются.
     const batch = [];
     for (const target of targets) {
+      if (settings.preferFresh && settings.shortlist) {
+        const cheap = deterministicScorer(settings.language);
+        const candidates = target.variants.map((text) => ({ text, profile: freshCandidateProfile(target.original, text,
+          settings.language, Boolean(settings.preview && target.semantic && target.semantic.has(text))) })).filter((item) => item.profile.safe);
+        const values = await cheap([target.original, ...candidates.map((item) => item.text)]);
+        candidates.forEach((item, index) => { item.value = values[index + 1]; item.rank = item.value - item.profile.novelty * 30 + Math.abs(1 - item.profile.lengthRatio) * 6; });
+        target.variants = candidates.filter((item) => Number.isFinite(item.value) && item.value <= values[0] + 4)
+          .sort((a, b) => a.rank - b.rank).slice(0, Math.min(2, settings.shortlist)).map((item) => item.text);
+      }
       target.offset = batch.length;
       batch.push(target.original, ...target.variants);
     }
 
-    return Promise.resolve(score(batch)).then((scores) => {
+    if (settings.isCancelled && settings.isCancelled()) throw new Error("Редактура остановлена.");
+    return Promise.resolve(score(batch, { groups: targets.map((target) => ({ offset: target.offset, count: target.variants.length + 1 })) })).then((scores) => {
       if (settings.isCancelled && settings.isCancelled()) throw new Error("Редактура остановлена.");
       if (!Array.isArray(scores) || scores.length !== batch.length) {
         throw new Error("CandidateSelect: оценка вернула не столько значений, сколько вариантов.");
@@ -445,6 +454,7 @@
           start: target.span.start,
           end: target.span.end,
           requiresReview: Boolean(best.profile && !best.profile.stableVocabulary),
+          semanticSimilarity: target.semantic && target.semantic.get(best.text),
         });
       }
 

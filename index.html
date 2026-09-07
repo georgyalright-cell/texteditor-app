@@ -12,12 +12,12 @@
     <meta name="referrer" content="no-referrer" />
     <title>TextEditor — обработка и сборка работ</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23108764'/%3E%3Cpath d='M8 9h16M16 9v15' stroke='white' stroke-width='3'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="styles.css?v=39" />
-    <link rel="stylesheet" href="workspace.css?v=39" />
-    <link rel="stylesheet" href="review.css?v=39" />
-    <link rel="stylesheet" href="neural-scorer.css?v=39" />
-    <link rel="stylesheet" href="help.css?v=39" />
-    <link rel="stylesheet" href="revision-preview.css?v=39" />
+    <link rel="stylesheet" href="styles.css?v=40" />
+    <link rel="stylesheet" href="workspace.css?v=40" />
+    <link rel="stylesheet" href="review.css?v=40" />
+    <link rel="stylesheet" href="neural-scorer.css?v=40" />
+    <link rel="stylesheet" href="help.css?v=40" />
+    <link rel="stylesheet" href="revision-preview.css?v=40" />
   </head>
   <body>
     <header class="site-header">
@@ -200,7 +200,7 @@
             Глубоко переработать формулировки
           </button>
           <p class="polish-download-note" id="polishDownloadNote" hidden>
-            Первый запуск: около 880 МБ для редактора и 140 МБ для проверки смысла, несколько минут ожидания. Далее используется кэш. Все варианты можно просмотреть перед применением.
+            Первый полный проход: около 1,5 ГБ — генератор, эмбеддинги и оценка перплексии. Модели запускаются по очереди; обработка может занять несколько минут. Загрузка обычно нужна один раз на устройство и браузер, не для каждого текста; после очистки кэша она повторится. Все варианты нужно просмотреть перед применением.
           </p>
           <button class="button button-secondary" id="polishCancelButton" type="button" hidden>Остановить редактуру</button>
           <button class="button button-accent" id="addPartButton" type="button" disabled hidden>
@@ -335,7 +335,8 @@
             <li>собирает <code>.docx</code> с полями 2/2/3/1.5 см, Times New Roman 12 pt, интервалом 1.15 и нумерацией страниц.</li>
           </ul>
           <p>Содержание разделов не сочиняется. В режиме сборки инструмент объединяет только предоставленные материалы и явно отмечает всё, чего не хватает.</p>
-          <p>Глубокая редакция учитывает соседний контекст и ориентир Business English B2–C1. Можно добавить собственный образец и защищённые термины. Генератор загружает около 880 МБ, проверка близости смысла — около 140 МБ. Подготовка может занять несколько минут. Варианты появляются для просмотра; выбранные замены попадают в TXT и DOCX. Нейрооценка перплексии включается отдельно и загружает ещё около 1 ГБ. Браузер может удалить кэш при очистке данных или нехватке места.</p>
+          <p>Глубокая редакция использует контекст и встроенные правила языка: английский B2–C1 Business English или русский академический. Эмбеддинги фильтруют близость смысла; перплексия помогает сравнить оставшиеся формулировки, но не определяет авторство. За проход выбирается до пяти предложений, для нейрооценки — до двух вариантов каждого. Сначала работает генератор, затем оценочные модели. Первый полный запуск загружает около 1,5 ГБ; браузер может удалить кэш при нехватке места. Если нейрооценка недоступна, сохраняется обычный отбор с предупреждением. Выбранные автором замены попадают в TXT и DOCX.</p>
+          <p>Watermark: проверка статистических водяных знаков не выполняется без известного алгоритма и необходимых параметров. Чистка невидимых символов не является удалением watermark. Ни сходство эмбеддингов, ни перплексия не гарантируют прохождение внешних AI-детекторов.</p>
         </div>
       </details>
     </main>
@@ -361,7 +362,7 @@
             <li>Вставьте черновик или выберите файл.</li>
             <li>Нажмите «Обработать текст».</li>
             <li>Язык определяется автоматически: английский — B2–C1 Business English, русский — естественный академический язык для университетских работ разных тем. Настраивать стиль или загружать образцы не нужно; оформление сохраняется по выбранному формату документа.</li>
-            <li>Нажмите «Глубоко переработать формулировки». Первая загрузка — около 880 МБ + 140 МБ для сравнения смысла; несколько минут ожидания. Редактуру можно остановить.</li>
+            <li>Нажмите «Глубоко переработать формулировки». Генерация → эмбеддинги → сравнение перплексии. Первая полная загрузка — около 1,5 ГБ; несколько минут ожидания. Редактуру можно остановить.</li>
             <li>Сравните предложенные формулировки, отметьте подходящие и нажмите «Применить выбранные». До этого исходный результат не меняется.</li>
             <li>Скачайте итог в DOCX или TXT.</li>
           </ol>
@@ -389,43 +390,44 @@
       </p>
     </dialog>
 
-    <script src="vendor/mammoth/mammoth.browser.min.js?v=39" defer></script>
-    <script src="vendor/jszip/jszip.min.js?v=39" defer></script>
-    <script src="vendor/sheetjs/xlsx.full.min.js?v=39" defer></script>
-    <script src="format-profiles.js?v=39" defer></script>
-    <script src="typography.js?v=39" defer></script>
-    <script src="humanizer-metrics.js?v=39" defer></script>
-    <script src="anchor-guard.js?v=39" defer></script>
-    <script src="text-metrics.js?v=39" defer></script>
-    <script src="edit-passes.js?v=39" defer></script>
-    <script src="elicitation.js?v=39" defer></script>
-    <script src="revision-store.js?v=39" defer></script>
-    <script src="processor.js?v=39" defer></script>
-    <script src="paraphraser.js?v=39" defer></script>
-    <script src="rewriter.js?v=39" defer></script>
-    <script src="deep-revision.js?v=39" defer></script>
-    <script src="candidate-select.js?v=39" defer></script>
-    <script src="weak-spots.js?v=39" defer></script>
-    <script src="usage-baseline.js?v=39" defer></script>
-    <script src="humanizer-engine.js?v=39" defer></script>
-    <script src="text-pipeline.js?v=39" defer></script>
-    <script src="structurer.js?v=39" defer></script>
-    <script src="document-builder.js?v=39" defer></script>
-    <script src="docx-writer.js?v=39" defer></script>
-    <script src="document-reader.js?v=39" defer></script>
-    <script src="work-project.js?v=39" defer></script>
-    <script src="project-view.js?v=39" defer></script>
-    <script src="neural-scorer.js?v=39" defer></script>
-    <script src="generator-core.js?v=39" defer></script>
-    <script src="generator.js?v=39" defer></script>
-    <script src="business-english.js?v=39" defer></script>
-    <script src="revision-quality.js?v=39" defer></script>
-    <script src="revision-candidates.js?v=39" defer></script>
-    <script src="semantic-scorer.js?v=39" defer></script>
-    <script src="revision-preview.js?v=39" defer></script>
-    <script src="polish-ui.js?v=39" defer></script>
-    <script src="review-ui.js?v=39" defer></script>
-    <script src="help-dialog.js?v=39" defer></script>
-    <script src="app.js?v=39" defer></script>
+    <script src="vendor/mammoth/mammoth.browser.min.js?v=40" defer></script>
+    <script src="vendor/jszip/jszip.min.js?v=40" defer></script>
+    <script src="vendor/sheetjs/xlsx.full.min.js?v=40" defer></script>
+    <script src="format-profiles.js?v=40" defer></script>
+    <script src="typography.js?v=40" defer></script>
+    <script src="humanizer-metrics.js?v=40" defer></script>
+    <script src="anchor-guard.js?v=40" defer></script>
+    <script src="text-metrics.js?v=40" defer></script>
+    <script src="edit-passes.js?v=40" defer></script>
+    <script src="elicitation.js?v=40" defer></script>
+    <script src="revision-store.js?v=40" defer></script>
+    <script src="processor.js?v=40" defer></script>
+    <script src="paraphraser.js?v=40" defer></script>
+    <script src="rewriter.js?v=40" defer></script>
+    <script src="deep-revision.js?v=40" defer></script>
+    <script src="candidate-select.js?v=40" defer></script>
+    <script src="weak-spots.js?v=40" defer></script>
+    <script src="usage-baseline.js?v=40" defer></script>
+    <script src="humanizer-engine.js?v=40" defer></script>
+    <script src="text-pipeline.js?v=40" defer></script>
+    <script src="structurer.js?v=40" defer></script>
+    <script src="document-builder.js?v=40" defer></script>
+    <script src="docx-writer.js?v=40" defer></script>
+    <script src="document-reader.js?v=40" defer></script>
+    <script src="work-project.js?v=40" defer></script>
+    <script src="project-view.js?v=40" defer></script>
+    <script src="neural-scorer.js?v=40" defer></script>
+    <script src="generator-core.js?v=40" defer></script>
+    <script src="generator.js?v=40" defer></script>
+    <script src="business-english.js?v=40" defer></script>
+    <script src="revision-quality.js?v=40" defer></script>
+    <script src="revision-candidates.js?v=40" defer></script>
+    <script src="semantic-scorer.js?v=40" defer></script>
+    <script src="revision-preview.js?v=40" defer></script>
+    <script src="neural-ranking.js?v=40" defer></script>
+    <script src="polish-ui.js?v=40" defer></script>
+    <script src="review-ui.js?v=40" defer></script>
+    <script src="help-dialog.js?v=40" defer></script>
+    <script src="app.js?v=40" defer></script>
   </body>
 </html>

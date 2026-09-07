@@ -82,5 +82,33 @@
     };
   }
 
-  return { scoreLogits };
+  // Single-model teacher-forced PPL. Deep selection does not need the second
+  // model used by comparative Binoculars diagnostics.
+  function scorePerplexity(logits, inputIds, dims) {
+    assertFiniteArray(logits, "Logits");
+    assertFiniteArray(inputIds, "Input IDs");
+    const { tokens, vocabulary } = normalizeDims(dims, "Logits");
+    if (inputIds.length !== tokens || logits.length < tokens * vocabulary) {
+      throw new RangeError("Неполные логиты для целого предложения.");
+    }
+    let total = 0;
+    for (let position = 0; position < tokens - 1; position += 1) {
+      const offset = position * vocabulary;
+      const target = Number(inputIds[position + 1]);
+      if (!Number.isInteger(target) || target < 0 || target >= vocabulary) throw new RangeError("Некорректный токен.");
+      let maximum = -Infinity;
+      for (let token = 0; token < vocabulary; token += 1) {
+        const value = Number(logits[offset + token]);
+        if (!Number.isFinite(value)) throw new RangeError("Неконечные логиты.");
+        maximum = Math.max(maximum, value);
+      }
+      let sum = 0;
+      for (let token = 0; token < vocabulary; token += 1) sum += Math.exp(Number(logits[offset + token]) - maximum);
+      total += maximum + Math.log(sum) - Number(logits[offset + target]);
+    }
+    const logPerplexity = total / (tokens - 1);
+    return { logPerplexity, perplexity: Math.exp(Math.min(logPerplexity, 50)), tokenCount: tokens };
+  }
+
+  return { scoreLogits, scorePerplexity };
 });

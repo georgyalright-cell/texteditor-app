@@ -25,9 +25,11 @@
     // One default flow; never revive a stored personal style or glossary.
     const settings = { semantic: true, terms: [] };
     const selector = root.CandidateSelect;
-    const warm = Boolean(engine && engine.warm && engine.warm());
-    const ranker = warm && selector.hybridScorer ? selector.hybridScorer(options.language, engine) : null;
-    const budget = ranker ? { share: 0.15, limit: 5 } : { share: 0.35, limit: 12 };
+    const ranker = root.NeuralRanking.create({
+      baseline: selector.deterministicScorer(options.language), engine,
+      isCancelled: () => !current(), releaseGenerator: () => root.Generator.cancel(),
+    });
+    const budget = { share: 0.35, limit: 5, shortlist: 2 };
     const label = button.textContent;
     button.disabled = true; button.textContent = "Глубокая редакция…"; stop.hidden = false;
     root.RevisionPreview.clear();
@@ -37,7 +39,7 @@
     try {
       const result = await selector.polishSentences(options.text, {
         ...settings, ...budget, language: options.language, preferFresh: true,
-        contextual: true, preview: true, score: ranker || undefined,
+        contextual: true, preview: true, score: ranker.score,
         isCancelled: () => !current(),
         semanticScore: settings.semantic ? (pairs) => root.SemanticScorer.score(pairs) : undefined,
         generate: (sentence, context) => root.Generator.paraphrase(sentence, {
@@ -47,11 +49,12 @@
       if (!current()) return;
       if (!result.ok) { options.report(result.warnings.join(" "), true); return; }
       const warnings = (result.generatorWarnings || []).join(". ");
+      for (const detail of result.details) detail.neural = ranker.pair(detail.before, detail.after);
       if (!result.replaced) {
-        options.report(`Подходящих вариантов не найдено. Текущий текст сохранён.${warnings ? ` ${warnings}` : " Можно попробовать другой фрагмент; менять удачную формулировку необязательно."}`, Boolean(warnings));
+        options.report(`Подходящих вариантов не найдено. Текущий текст сохранён. ${ranker.summary()}${warnings ? ` ${warnings}` : " Менять удачную формулировку необязательно."}`, Boolean(warnings));
         return;
       }
-      options.report(`Для просмотра готово ${result.replaced} замен.${warnings ? ` ${warnings}` : ""}`, Boolean(warnings));
+      options.report(`Для просмотра готово ${result.replaced} замен. ${ranker.summary()}${warnings ? ` ${warnings}` : ""}`, Boolean(warnings));
       root.RevisionPreview.show(result, (accepted) => { if (current()) options.apply(accepted); });
     } catch (error) { if (current()) options.report(error.message || "Редактура недоступна.", true); }
     finally {
