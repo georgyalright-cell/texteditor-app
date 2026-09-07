@@ -12,12 +12,12 @@
     <meta name="referrer" content="no-referrer" />
     <title>TextEditor — обработка и сборка работ</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23108764'/%3E%3Cpath d='M8 9h16M16 9v15' stroke='white' stroke-width='3'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="styles.css?v=41" />
-    <link rel="stylesheet" href="workspace.css?v=41" />
-    <link rel="stylesheet" href="review.css?v=41" />
-    <link rel="stylesheet" href="neural-scorer.css?v=41" />
-    <link rel="stylesheet" href="help.css?v=41" />
-    <link rel="stylesheet" href="revision-preview.css?v=41" />
+    <link rel="stylesheet" href="styles.css?v=42" />
+    <link rel="stylesheet" href="workspace.css?v=42" />
+    <link rel="stylesheet" href="review.css?v=42" />
+    <link rel="stylesheet" href="neural-scorer.css?v=42" />
+    <link rel="stylesheet" href="help.css?v=42" />
+    <link rel="stylesheet" href="revision-preview.css?v=42" />
   </head>
   <body>
     <header class="site-header">
@@ -196,12 +196,6 @@
           <button class="button button-primary" id="processButton" type="button" disabled>
             Обработать текст
           </button>
-          <button class="button button-accent" id="polishButton" type="button" disabled hidden>
-            Глубоко переработать формулировки
-          </button>
-          <p class="polish-download-note" id="polishDownloadNote" hidden>
-            Первый полный проход: около 1,5 ГБ — генератор, эмбеддинги и оценка перплексии. Модели запускаются по очереди; обработка может занять несколько минут. Загрузка обычно нужна один раз на устройство и браузер, не для каждого текста; после очистки кэша она повторится. Все варианты нужно просмотреть перед применением.
-          </p>
           <button class="button button-secondary" id="polishCancelButton" type="button" hidden>Остановить редактуру</button>
           <button class="button button-accent" id="addPartButton" type="button" disabled hidden>
             Добавить часть в работу
@@ -219,6 +213,11 @@
             Очистить
           </button>
         </div>
+
+        <p class="polish-download-note" id="polishDownloadNote">
+          Один запуск: правила → локальная редактура → проверка смысла и перплексии → просмотр вариантов.
+          Первый полный проход — около 1,5 ГБ моделей и несколько минут ожидания. Далее используется кэш этого браузера; после его очистки загрузка повторится. Можно остановить модели и сохранить базовый результат. Без WebGPU доступна базовая обработка. Предложения модели применяются только после вашего подтверждения; прохождение AI-детекторов не гарантируется.
+        </p>
 
         <section class="model-load-status" id="modelLoadStatus" hidden aria-labelledby="modelLoadTitle">
           <h3 id="modelLoadTitle">Локальные модели — ход работы</h3>
@@ -307,22 +306,23 @@
         </details>
       </section>
 
-      <section class="neural-assistant" id="neuralAssistant" hidden aria-labelledby="neural-title">
+      <details class="neural-assistant" id="neuralAssistant" hidden>
+        <summary>Исследовательская диагностика — необязательно</summary>
         <div class="neural-heading">
           <div>
             <h2 id="neural-title">Локальная нейрооценка</h2>
             <p>
               Две небольшие языковые модели сравнят исходник и результат по реальной перплексии и Binoculars.
-              Отдельная инструктивная модель создаёт варианты для кнопки отбора формулировок.
+              Основная обработка уже включает генератор, проверку смысла и перплексию. Эта диагностика не редактирует текст и не нужна для основного запуска.
               Текст остаётся на устройстве; сервер и ключи не нужны.
               Первая загрузка отдельной диагностики — около 1 ГБ; уже сохранённые модели используются из кэша.
             </p>
           </div>
-          <button class="button button-secondary neural-action" id="neuralScoreButton" type="button">Загрузить и оценить</button>
+          <button class="button button-secondary neural-action" id="neuralScoreButton" type="button">Рассчитать диагностику</button>
         </div>
         <div class="neural-results" id="neuralResults" hidden></div>
         <p class="neural-result-note" id="neuralResultNote"></p>
-      </section>
+      </details>
 
       <section class="compliance" id="compliance" hidden aria-labelledby="compliance-title">
         <h2 class="compliance-title" id="compliance-title">Соответствие требованиям</h2>
@@ -368,7 +368,7 @@
             <li>Вставьте черновик или выберите файл.</li>
             <li>Нажмите «Обработать текст».</li>
             <li>Язык определяется автоматически: английский — B2–C1 Business English, русский — естественный академический язык для университетских работ разных тем. Настраивать стиль или загружать образцы не нужно; оформление сохраняется по выбранному формату документа.</li>
-            <li>Нажмите «Глубоко переработать формулировки». Генерация → эмбеддинги → сравнение перплексии. Первая полная загрузка — около 1,5 ГБ; несколько минут ожидания. Редактуру можно остановить.</li>
+            <li>Модели запустятся автоматически после правил: генерация → эмбеддинги → сравнение перплексии. Первая полная загрузка — около 1,5 ГБ; несколько минут ожидания. Статус под кнопками показывает текущую модель, файл и этап. Можно остановить редактуру и оставить базовый результат.</li>
             <li>Сравните предложенные формулировки, отметьте подходящие и нажмите «Применить выбранные». До этого исходный результат не меняется.</li>
             <li>Скачайте итог в DOCX или TXT.</li>
           </ol>
@@ -380,7 +380,7 @@
           <ol>
             <li>Заполните паспорт работы.</li>
             <li>Выберите раздел, вставьте материал и обработайте его.</li>
-            <li>При необходимости выполните глубокую редакцию и примените выбранные варианты. Затем нажмите «Добавить часть в работу» и повторите для остальных разделов.</li>
+            <li>Дождитесь предложений модели или остановите её; примените подходящие варианты. Затем нажмите «Добавить часть в работу» и повторите для остальных разделов. При сборке сохранённые части повторно моделью не переписываются.</li>
             <li>Закройте пункты готовности, соберите документ и скачайте DOCX.</li>
           </ol>
         </section>
@@ -396,44 +396,46 @@
       </p>
     </dialog>
 
-    <script src="vendor/mammoth/mammoth.browser.min.js?v=41" defer></script>
-    <script src="vendor/jszip/jszip.min.js?v=41" defer></script>
-    <script src="vendor/sheetjs/xlsx.full.min.js?v=41" defer></script>
-    <script src="format-profiles.js?v=41" defer></script>
-    <script src="typography.js?v=41" defer></script>
-    <script src="humanizer-metrics.js?v=41" defer></script>
-    <script src="anchor-guard.js?v=41" defer></script>
-    <script src="text-metrics.js?v=41" defer></script>
-    <script src="edit-passes.js?v=41" defer></script>
-    <script src="elicitation.js?v=41" defer></script>
-    <script src="revision-store.js?v=41" defer></script>
-    <script src="processor.js?v=41" defer></script>
-    <script src="paraphraser.js?v=41" defer></script>
-    <script src="rewriter.js?v=41" defer></script>
-    <script src="deep-revision.js?v=41" defer></script>
-    <script src="candidate-select.js?v=41" defer></script>
-    <script src="weak-spots.js?v=41" defer></script>
-    <script src="usage-baseline.js?v=41" defer></script>
-    <script src="humanizer-engine.js?v=41" defer></script>
-    <script src="text-pipeline.js?v=41" defer></script>
-    <script src="structurer.js?v=41" defer></script>
-    <script src="document-builder.js?v=41" defer></script>
-    <script src="docx-writer.js?v=41" defer></script>
-    <script src="document-reader.js?v=41" defer></script>
-    <script src="work-project.js?v=41" defer></script>
-    <script src="project-view.js?v=41" defer></script>
-    <script src="neural-scorer.js?v=41" defer></script>
-    <script src="generator-core.js?v=41" defer></script>
-    <script src="generator.js?v=41" defer></script>
-    <script src="business-english.js?v=41" defer></script>
-    <script src="revision-quality.js?v=41" defer></script>
-    <script src="revision-candidates.js?v=41" defer></script>
-    <script src="semantic-scorer.js?v=41" defer></script>
-    <script src="revision-preview.js?v=41" defer></script>
-    <script src="neural-ranking.js?v=41" defer></script>
-    <script src="polish-ui.js?v=41" defer></script>
-    <script src="review-ui.js?v=41" defer></script>
-    <script src="help-dialog.js?v=41" defer></script>
-    <script src="app.js?v=41" defer></script>
+    <script src="vendor/mammoth/mammoth.browser.min.js?v=42" defer></script>
+    <script src="vendor/jszip/jszip.min.js?v=42" defer></script>
+    <script src="vendor/sheetjs/xlsx.full.min.js?v=42" defer></script>
+    <script src="format-profiles.js?v=42" defer></script>
+    <script src="typography.js?v=42" defer></script>
+    <script src="humanizer-metrics.js?v=42" defer></script>
+    <script src="anchor-guard.js?v=42" defer></script>
+    <script src="text-metrics.js?v=42" defer></script>
+    <script src="edit-passes.js?v=42" defer></script>
+    <script src="elicitation.js?v=42" defer></script>
+    <script src="revision-store.js?v=42" defer></script>
+    <script src="processor.js?v=42" defer></script>
+    <script src="paraphraser.js?v=42" defer></script>
+    <script src="rewriter.js?v=42" defer></script>
+    <script src="deep-revision.js?v=42" defer></script>
+    <script src="candidate-select.js?v=42" defer></script>
+    <script src="weak-spots.js?v=42" defer></script>
+    <script src="usage-baseline.js?v=42" defer></script>
+    <script src="humanizer-engine.js?v=42" defer></script>
+    <script src="text-pipeline.js?v=42" defer></script>
+    <script src="structurer.js?v=42" defer></script>
+    <script src="document-builder.js?v=42" defer></script>
+    <script src="docx-writer.js?v=42" defer></script>
+    <script src="document-reader.js?v=42" defer></script>
+    <script src="work-project.js?v=42" defer></script>
+    <script src="project-view.js?v=42" defer></script>
+    <script src="neural-scorer.js?v=42" defer></script>
+    <script src="generator-core.js?v=42" defer></script>
+    <script src="generator.js?v=42" defer></script>
+    <script src="business-english.js?v=42" defer></script>
+    <script src="meaning-guard.js?v=42" defer></script>
+    <script src="revision-quality.js?v=42" defer></script>
+    <script src="revision-candidates.js?v=42" defer></script>
+    <script src="semantic-scorer.js?v=42" defer></script>
+    <script src="revision-preview.js?v=42" defer></script>
+    <script src="neural-ranking.js?v=42" defer></script>
+    <script src="polish-ui.js?v=42" defer></script>
+    <script src="review-ui.js?v=42" defer></script>
+    <script src="help-dialog.js?v=42" defer></script>
+    <script src="processing-run.js?v=42" defer></script>
+    <script src="app.js?v=42" defer></script>
   </body>
 </html>

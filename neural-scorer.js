@@ -39,7 +39,7 @@
   function setBusy(value) {
     busy = value;
     elements.button.disabled = value || lockedForPolish || !texts.result || !supported();
-    elements.button.textContent = value ? "Оцениваю…" : "Загрузить и оценить";
+    elements.button.textContent = value ? "Оцениваю…" : "Рассчитать диагностику";
   }
 
   function lockForPolish() {
@@ -112,7 +112,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker("neural-worker.js?v=41");
+    worker = new Worker("neural-worker.js?v=42");
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "progress") {

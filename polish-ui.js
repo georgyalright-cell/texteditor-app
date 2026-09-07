@@ -2,8 +2,6 @@
   "use strict";
   let active = false;
   let sequence = 0;
-  const button = document.getElementById("polishButton");
-  const stop = document.getElementById("polishCancelButton");
 
   function cancel() {
     sequence += 1;
@@ -11,7 +9,6 @@
     if (root.SemanticScorer) root.SemanticScorer.cancel();
     if (root.NeuralScorerUI && root.NeuralScorerUI.cancelPolishScoring) root.NeuralScorerUI.cancelPolishScoring();
   }
-  stop.addEventListener("click", cancel);
 
   async function run(options) {
     if (active) return;
@@ -30,8 +27,6 @@
       isCancelled: () => !current(), releaseGenerator: () => root.Generator.cancel(),
     });
     const budget = { share: 0.35, limit: 5, shortlist: 2 };
-    const label = button.textContent;
-    button.disabled = true; button.textContent = "Глубокая редакция…"; stop.hidden = false;
     root.RevisionPreview.clear();
     options.report("Готовлю варианты с учётом контекста и стиля. Результат появится для просмотра перед применением.");
     // Bounds a stalled GPU request without changing the source or export state.
@@ -61,10 +56,9 @@
       clearTimeout(timer);
       if (operation !== sequence && options.isCurrent()) options.report("Редактура остановлена. Текущий текст сохранён.");
       if (root.Generator) root.Generator.release();
-      if (engine && engine.reportProgress) engine.reportProgress({ done: true,
+      if (options.isCurrent() && engine && engine.reportProgress) engine.reportProgress({ done: true,
         message: operation !== sequence ? "Редактура остановлена. Текущий текст сохранён." : "Локальный проход завершён. Итог и предупреждения — в отчёте о редактуре." });
       if (engine && engine.unlockAfterPolish) engine.unlockAfterPolish();
-      button.textContent = label; button.disabled = !root.Generator.supported(); stop.hidden = true;
       active = false;
     }
   }

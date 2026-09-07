@@ -195,7 +195,11 @@
       if (language === "ru" && /^в\s+достижении(?=\s|$)/iu.test(phrase)) {
         phrase = phrase.replace(/^в\s+достижении(?=\s|$)/iu, "Для достижения");
       }
-      if (wordTokens(prefix, language).length >= 3 && wordTokens(phrase, language).length >= 3) {
+      // Do not detach the tail of a nested phrase: "by aligning goals with
+      // forecasts" is not "with forecasts, ... by aligning goals". We have no
+      // dependency parser, so ambiguous English preposition chains stay intact.
+      const nestedPhrase = language === "en" && /\b(?:by|through|with|without|during|within|in|on|at|for|from|of|to)\b/iu.test(prefix);
+      if (!nestedPhrase && wordTokens(prefix, language).length >= 3 && wordTokens(phrase, language).length >= 3) {
         push(`${upperFirst(phrase, language)} ${lowerFirstCommon(prefix, language)}${punctuation}`);
       }
     }

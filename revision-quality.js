@@ -20,6 +20,9 @@
   }
   function check(source, candidate, terms) {
     const reasons = [];
+    const meaning = globalThis.MeaningGuard || (typeof require === "function" ? require("./meaning-guard.js") : null);
+    if (meaning) reasons.push(...meaning.check(source, candidate).reasons);
+    else reasons.push("проверка смысловых оговорок недоступна");
     if (!candidate || candidate.length > 1800 || /[\n\r\t|<>\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/u.test(candidate)) reasons.push("служебные символы или структура");
     if (!/[.!?…][»”"]?$/u.test(candidate.trim()) || /(?:[,;:]\s*[.!?]|\b(\w+)\s+\1\b)/iu.test(candidate)) reasons.push("незавершённая фраза или повтор");
     if (quotes(source) !== quotes(candidate)) reasons.push("изменена цитата");

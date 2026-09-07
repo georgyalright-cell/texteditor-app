@@ -6,6 +6,34 @@ const test = require("node:test");
 const core = require("./generator-core.js");
 const { create } = require("./generator.js");
 
+test("contextual generation uses four distinct editing approaches within the same cap", () => {
+  const plan = core.generationPlan({ contextual: true, creative: true, count: 99 });
+  assert.equal(plan.length, 4);
+  assert.equal(plan[0].creative, false);
+  assert.equal(new Set(plan.map(p => p.strategy)).size, 4);
+  for (const language of ["ru", "en"]) {
+    const messages = plan.map(p => core.buildMessages("Source.", { ...p, language, contextual: true })[0].content);
+    assert.equal(new Set(messages).size, 4);
+    for (const message of messages) assert.match(message, language === "en" ? /degree of certainty/ : /степень уверенности/);
+  }
+  assert.equal(core.generationPlan({ contextual: true, creative: true, count: 1 }).length, 1);
+  assert.ok(core.generationPlan({ count: 4 }).every(p => !p.creative));
+});
+test("output budget gives longer Russian sentences room without unbounded generation", () => {
+  assert.equal(core.outputBudget("Short sentence.", "en"), 160);
+  assert.equal(core.outputBudget("слово ".repeat(80), "ru"), 352);
+  assert.equal(core.outputBudget("word ".repeat(80), "en"), 192);
+  assert.equal(core.outputBudget("слово ".repeat(1000), "ru"), 384);
+});
+test("token-truncated and abnormal model completions never enter candidate selection", () => {
+  assert.deepEqual(core.completedChoices({ choices: [
+    { finish_reason: "length", message: { content: "A plausible but incomplete claim." } },
+    { finish_reason: "stop", message: { content: "Completed sentence." } },
+    { finish_reason: "error", message: { content: "Broken sentence." } },
+  ] }), ["Completed sentence."]);
+  assert.deepEqual(core.completedChoices(null), []);
+});
+
 test("русский и английский получают разные строгие промпты", () => {
   const ru = core.buildMessages("Выручка выросла на 12%.", { language: "ru", count: 4 });
   const en = core.buildMessages("Revenue rose by 12%.", { language: "en", count: 4 });
@@ -115,5 +143,5 @@ test("глубокая редакция добавляет только конт
   assert.match(workerSource, /SAMPLING_TOP_P = 0\.92/u);
   assert.match(workerSource, /seed: samplingSeed\(request\.id\)/u);
   assert.doesNotMatch(workerSource, /seed:\s*20260903/u);
-  assert.match(generatorSource, /generator-worker\.js\?v=41/u);
+  assert.match(generatorSource, /generator-worker\.js\?v=42/u);
 });

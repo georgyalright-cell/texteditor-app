@@ -1,9 +1,10 @@
 "use strict";
 
-import "./author-style.js?v=41";
-import "./business-english.js?v=41";
-import "./generator-core.js?v=41";
-import "./model-progress.js?v=41";
+import "./author-style.js?v=42";
+import "./business-english.js?v=42";
+import "./generator-core.js?v=42";
+import "./meaning-guard.js?v=42";
+import "./model-progress.js?v=42";
 import { CreateMLCEngine } from "./vendor/webllm/web-llm.mjs";
 
 const GENERATOR_MODEL = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
@@ -14,7 +15,6 @@ const MODEL_LIBRARY = new URL(
   "./vendor/webllm/Qwen2-1.5B-Instruct-q4f16_1-ctx4k_cs1k-webgpu.wasm",
   self.location.href,
 ).href;
-const MAX_NEW_TOKENS = 160;
 const SAMPLING_TEMPERATURE = 0.68;
 const SAMPLING_TOP_P = 0.92;
 
@@ -96,27 +96,30 @@ async function paraphrase(request) {
       progress: null,
       message: `Глубокая редакция${stage}: создаю ${count} варианта…`,
     });
-    const generate = (creative, variants) => localEngine.chat.completions.create({
+    const generate = ({ creative, strategy }) => localEngine.chat.completions.create({
       messages: self.GeneratorCore.buildMessages(sentence, {
         ...request,
         creative,
+        strategy,
         language: request.language,
         count: 1,
       }),
       model: GENERATOR_MODEL,
-      n: variants,
-      max_tokens: MAX_NEW_TOKENS,
+      n: 1,
+      max_tokens: self.GeneratorCore.outputBudget(sentence, request.language),
       temperature: request.contextual && !creative ? 0.4 : SAMPLING_TEMPERATURE,
       top_p: SAMPLING_TOP_P,
       repetition_penalty: 1.08,
       seed: samplingSeed(request.id),
     });
-    const responses = request.contextual && request.creative && count > 1
-      ? [await generate(false, Math.ceil(count / 2)), await generate(true, Math.floor(count / 2))]
-      : [await generate(false, count)];
-    const raw = responses.flatMap((response) => Array.isArray(response && response.choices)
-      ? response.choices.map((choice) => choice && choice.message && choice.message.content)
-      : []);
+    const raw = [];
+    const plan = self.GeneratorCore.generationPlan(request);
+    for (const [index, approach] of plan.entries()) {
+      send("progress", { progress: null,
+        message: `Глубокая редакция${stage} · вариант ${index + 1} из ${count} · лимит ответа ${self.GeneratorCore.outputBudget(sentence, request.language)} токенов…` });
+      raw.push(...self.GeneratorCore.completedChoices(await generate(approach)));
+    }
+    if (!raw.length) throw new Error("Модель не завершила ни одного варианта в пределах лимита. Незавершённые ответы отброшены.");
     const variants = self.GeneratorCore.parseVariants(raw, { sentence, count });
     send("variants", { id: request.id, variants });
   } catch (error) {

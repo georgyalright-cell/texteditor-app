@@ -425,8 +425,6 @@
     state.context = context || {};
     state.deepRevision = state.context.deepRevision || null;
     nodes.review.hidden = !state.baseText.trim();
-    if (nodes.polishButton) nodes.polishButton.hidden = !state.baseText.trim();
-    if (nodes.polishDownloadNote) nodes.polishDownloadNote.hidden = !state.baseText.trim();
     if (!state.baseText.trim()) return;
 
     state.baseReport = metricsApi().analyze(state.baseText, { genreId: genreId() });
@@ -453,23 +451,17 @@
     state.report = null;
     state.deepRevision = null;
     if (nodes.review) nodes.review.hidden = true;
-    if (nodes.polishButton) {
-      nodes.polishButton.hidden = true;
-      nodes.polishButton.textContent = "Глубоко переработать формулировки";
-    }
-    if (nodes.polishDownloadNote) nodes.polishDownloadNote.hidden = true;
   }
 
   /**
-   * Глубокая редакция формулировок локальной моделью. Она остаётся отдельным
-   * осознанным шагом, чтобы обычная обработка не начинала скрытую загрузку
-   * модели. Результат становится новым исходником панели: после замены
+   * Продолжение единого запуска. Загрузка объяснена рядом с основной кнопкой.
+   * Только подтверждённый результат становится новым исходником: после замены
    * предложений прежние спаны композиционных правок уже указывают не туда.
    */
   function polishWithModel() {
     if (!root.PolishUI || !state.workingText) return;
     const operation = state.operation;
-    root.PolishUI.run({
+    return root.PolishUI.run({
       text: state.workingText,
       language: state.report.language,
       isCurrent: () => operation === state.operation,
@@ -507,8 +499,6 @@
       weakList: document.querySelector("#weakList"),
       weakNote: document.querySelector("#weakNote"),
       weakCount: document.querySelector("#weakCount"),
-      polishButton: document.querySelector("#polishButton"),
-      polishDownloadNote: document.querySelector("#polishDownloadNote"),
       reviewBaseline: document.querySelector("#reviewBaseline"),
       acceptSafeButton: document.querySelector("#acceptSafeButton"),
       clearEditsButton: document.querySelector("#clearEditsButton"),
@@ -531,18 +521,6 @@
       state.accepted = new Set();
       rebuild();
     });
-    if (nodes.polishButton) {
-      nodes.polishButton.hidden = true;
-      const generatorAvailable = root.Generator && root.Generator.supported && root.Generator.supported();
-      nodes.polishButton.disabled = !generatorAvailable;
-      if (!generatorAvailable) {
-        nodes.polishButton.disabled = true;
-        nodes.polishButton.title =
-          "Нужен WebGPU: глубокая редакция идёт локальной моделью. Остальная обработка работает без неё.";
-      }
-      nodes.polishButton.addEventListener("click", polishWithModel);
-    }
-    if (nodes.polishDownloadNote) nodes.polishDownloadNote.hidden = true;
     nodes.saveRevisionButton.addEventListener("click", () => {
       const store = root.RevisionStore;
       if (!store || !state.workingText) return;
@@ -556,5 +534,5 @@
     });
   }
 
-  root.ReviewUI = { mount, update, reset, genreId, currentText: () => state.workingText };
+  root.ReviewUI = { mount, update, reset, genreId, polishWithModel, currentText: () => state.workingText };
 })(typeof globalThis !== "undefined" ? globalThis : window);

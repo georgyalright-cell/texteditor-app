@@ -65,6 +65,19 @@
   let sourceFilename = "";
   let project = loadProject();
   let activeReview = null;
+  const processing = window.ProcessingRun.create({
+    base: processSource,
+    supported: () => Boolean(window.Generator && window.Generator.supported()),
+    polish: () => window.ReviewUI.polishWithModel(),
+    cancel: () => { if (window.PolishUI) window.PolishUI.cancel(); },
+    notice: (message) => window.NeuralScorerUI.reportProgress({ done: true, isError: true, message }),
+    busy(value) {
+      elements.processButton.textContent = value ? "Обрабатываю…" : currentMode === "project" ? "Обработать часть" : "Обработать текст";
+      document.getElementById("polishCancelButton").hidden = !value;
+      elements.processButton.setAttribute("aria-busy", String(value));
+      updateControls();
+    },
+  });
 
   function pluralForm(value, one, few, many) {
     const absolute = Math.abs(value) % 100;
@@ -157,12 +170,12 @@
     const hasResult = Boolean(currentResult);
     const hasParts = Boolean(project && project.parts.length);
     elements.sourceCount.textContent = characterLabel(elements.sourceText.value.length);
-    elements.processButton.disabled = !hasSource;
+    elements.processButton.disabled = !hasSource || processing.busy();
     elements.clearButton.disabled = !hasSource && !hasResult;
     elements.downloadButton.disabled = !hasResult;
     elements.downloadDocxButton.disabled = !hasResult || !currentBlocks.length;
-    elements.addPartButton.disabled = currentMode !== "project" || !currentProcessedPart;
-    elements.assembleProjectButton.disabled = currentMode !== "project" || !hasParts;
+    elements.addPartButton.disabled = processing.busy() || currentMode !== "project" || !currentProcessedPart;
+    elements.assembleProjectButton.disabled = processing.busy() || currentMode !== "project" || !hasParts;
   }
 
   function renderMetrics(result, before) {
@@ -254,6 +267,7 @@
   }
 
   function resetResult() {
+    processing.cancel();
     currentBlocks = [];
     currentOutputKind = "";
     currentOutputProfileId = "";
@@ -405,6 +419,7 @@
       const source = elements.sourceText.value;
       const processed = window.TextPipeline.run(source);
       startReview(source, processed, currentMode === "project" ? "part" : "fragment", pipelineProfileId());
+      return true;
     } catch (error) {
       setResultState("Ошибка обработки", "error");
       setStatus(elements.resultNote, error instanceof Error ? error.message : "Не удалось обработать текст.", true);
@@ -605,11 +620,12 @@
   elements.sourceText.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
       event.preventDefault();
-      processSource();
+      processing.run();
     }
   });
   elements.fileInput.addEventListener("change", () => loadFile(elements.fileInput.files[0]));
-  elements.processButton.addEventListener("click", processSource);
+  elements.processButton.addEventListener("click", () => processing.run());
+  document.getElementById("polishCancelButton").addEventListener("click", () => processing.cancel());
   elements.addPartButton.addEventListener("click", addCurrentPart);
   elements.assembleProjectButton.addEventListener("click", assembleProject);
   elements.resetProjectButton.addEventListener("click", resetProject);

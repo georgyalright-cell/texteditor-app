@@ -97,3 +97,11 @@ test("by phrases modifying participles are not moved to the main predicate", () 
     "The company can reduce losses driven by rising costs.",
   ]) assert.equal(deep.syntacticReorderVariants(text,"en").some(value=>value.startsWith("By ")), false);
 });
+
+test("nested English prepositions retain their original clause attachment", () => {
+  const deep = require("./deep-revision.js");
+  for (const source of [
+    "This business plan provides a framework for achieving long-term success by aligning goals with realistic financial projections and risk management.",
+    "The team improves planning by comparing forecasts with historical sales data.",
+  ]) assert.equal(deep.syntacticReorderVariants(source, "en").some(value => value.startsWith("With ")), false);
+});

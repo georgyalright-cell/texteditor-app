@@ -27,7 +27,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new root.Worker("generator-worker.js?v=41", { type: "module" });
+    worker = new root.Worker("generator-worker.js?v=42", { type: "module" });
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "progress") {
@@ -84,7 +84,7 @@
         terms: settings.terms,
       }); } catch (error) { pending.delete(id); reject(error); }
     }).catch((error) => {
-      report({ message: `Генератор недоступен: ${error.message}. Продолжаю со словарными версиями.`, isError: true });
+      if (error.message !== "Редактура остановлена.") report({ message: `Генератор недоступен: ${error.message}. Продолжаю со словарными версиями.`, isError: true });
       throw error;
     });
   }

@@ -49,7 +49,10 @@ test("production не загружает исполняемый код с вне
 test("глубокая редакция использует одну существующую кнопку и локальный генератор", () => {
   const index = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
   const review = fs.readFileSync(path.join(__dirname, "polish-ui.js"), "utf8");
-  assert.equal((index.match(/id=["']polishButton["']/gu) || []).length, 1);
+  assert.equal((index.match(/id=["']processButton["']/gu) || []).length, 1);
+  assert.equal((index.match(/id=["']polishButton["']/gu) || []).length, 0);
+  assert.match(index, /processing-run\.js\?v=/u);
+  assert.match(index, /<details[^>]*id="neuralAssistant"/u);
   assert.match(review, /preferFresh:\s*true/u);
   assert.match(review, /share:\s*0\.35/u);
   assert.doesNotMatch(review, /perplexityScorer\(root\.NeuralScorerUI\)/u);
