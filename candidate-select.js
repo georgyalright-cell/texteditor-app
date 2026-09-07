@@ -423,9 +423,7 @@
             const semanticVerified = Boolean(settings.preview && target.semantic && target.semantic.has(text));
             const profile = freshCandidateProfile(target.original, text, settings.language, semanticVerified);
             if (!profile.safe || !Number.isFinite(baseline) || value > baseline + 4) continue;
-            const style = globalThis.AuthorStyle || (typeof require === "function" ? require("./author-style.js") : null);
-            const stylePenalty = style && settings.authorProfile ? style.distance(text, settings.authorProfile) * 3 : 0;
-            const objective = value - profile.novelty * 30 + Math.abs(1 - profile.lengthRatio) * 6 + stylePenalty;
+            const objective = value - profile.novelty * 30 + Math.abs(1 - profile.lengthRatio) * 6;
             if (!best || objective < best.objective) {
               best = { text: target.variants[index], score: value, objective, profile };
             }

@@ -1,5 +1,5 @@
 "use strict";
-importScripts("./revision-quality.js?v=38");
+importScripts("./revision-quality.js?v=39");
 
 const MODEL = "Xenova/paraphrase-multilingual-MiniLM-L12-v2";
 const REVISION = "2c4055b12046f11709e9df2c122e59ffbdc2f900";
@@ -9,7 +9,7 @@ const progress = (message) => self.postMessage({ type: "progress", message });
 
 async function load() {
   if (extractor) return;
-  const { pipeline, env } = await import("./vendor/transformers/transformers.web.min.mjs?v=38");
+  const { pipeline, env } = await import("./vendor/transformers/transformers.web.min.mjs?v=39");
   env.allowLocalModels = false;
   env.backends.onnx.wasm.numThreads = 1;
   env.backends.onnx.wasm.wasmPaths = {

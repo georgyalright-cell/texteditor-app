@@ -22,7 +22,8 @@
     active = true;
     const operation = ++sequence;
     const current = () => operation === sequence && options.isCurrent();
-    const settings = root.AuthorStyleUI.snapshot(options.language);
+    // One default flow; never revive a stored personal style or glossary.
+    const settings = { semantic: true, terms: [] };
     const selector = root.CandidateSelect;
     const warm = Boolean(engine && engine.warm && engine.warm());
     const ranker = warm && selector.hybridScorer ? selector.hybridScorer(options.language, engine) : null;
@@ -47,7 +48,7 @@
       if (!result.ok) { options.report(result.warnings.join(" "), true); return; }
       const warnings = (result.generatorWarnings || []).join(". ");
       if (!result.replaced) {
-        options.report(`Подходящих вариантов не найдено. Текущий текст сохранён.${warnings ? ` ${warnings}` : " Попробуйте другой фрагмент или добавьте образец стиля."}`, Boolean(warnings));
+        options.report(`Подходящих вариантов не найдено. Текущий текст сохранён.${warnings ? ` ${warnings}` : " Можно попробовать другой фрагмент; менять удачную формулировку необязательно."}`, Boolean(warnings));
         return;
       }
       options.report(`Для просмотра готово ${result.replaced} замен.${warnings ? ` ${warnings}` : ""}`, Boolean(warnings));

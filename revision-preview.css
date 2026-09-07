@@ -1,0 +1,10 @@
+.revision-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
+.revision-preview { margin: 1.5rem 0; padding: 1.2rem; border: 1px solid #b9c2d0; border-radius: 12px; }
+.revision-preview h2 { margin-top: 0; font-size: 1.4rem; }
+.revision-preview p { line-height: 1.55; }
+.revision-preview ol { padding-left: 1.5rem; }
+.revision-choice { padding: 1rem 0; border-bottom: 1px solid #d7dce3; }
+.revision-choice label { display: flex; gap: .6rem; font-weight: 600; }
+.revision-before { color: #69717c; }
+.revision-after { color: #173d32; }
+@media (max-width: 600px) { .revision-actions .button { width: 100%; } .revision-preview { padding: .8rem; } }

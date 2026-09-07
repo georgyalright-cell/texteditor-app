@@ -108,7 +108,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker("neural-worker.js?v=38");
+    worker = new Worker("neural-worker.js?v=39");
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "progress") {

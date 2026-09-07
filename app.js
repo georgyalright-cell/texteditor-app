@@ -403,7 +403,7 @@
     if (!elements.sourceText.value.trim()) return;
     try {
       const source = elements.sourceText.value;
-      const processed = window.TextPipeline.run(source, { terms: window.AuthorStyleUI ? window.AuthorStyleUI.snapshot().terms : [] });
+      const processed = window.TextPipeline.run(source);
       startReview(source, processed, currentMode === "project" ? "part" : "fragment", pipelineProfileId());
     } catch (error) {
       setResultState("Ошибка обработки", "error");
@@ -450,7 +450,7 @@
       return;
     }
     try {
-      const processed = window.TextPipeline.run(source, { terms: window.AuthorStyleUI ? window.AuthorStyleUI.snapshot().terms : [] });
+      const processed = window.TextPipeline.run(source);
       startReview(source, processed, "document", selectedProfileId());
     } catch (error) {
       setStatus(elements.resultNote, error instanceof Error ? error.message : "Не удалось собрать документ.", true);

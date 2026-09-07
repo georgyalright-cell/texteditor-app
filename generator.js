@@ -27,7 +27,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new root.Worker("generator-worker.js?v=38", { type: "module" });
+    worker = new root.Worker("generator-worker.js?v=39", { type: "module" });
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "progress") {
@@ -81,7 +81,6 @@
         contextual: settings.contextual === true,
         creative: settings.creative === true,
         context: settings.context,
-        authorProfile: settings.authorProfile,
         terms: settings.terms,
       }); } catch (error) { pending.delete(id); reject(error); }
     }).catch((error) => {
