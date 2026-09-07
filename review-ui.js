@@ -385,9 +385,16 @@
 
   function rebuild(options) {
     if (!state.proposal) return;
+    if (root.PolishUI && root.PolishUI.busy()) root.PolishUI.cancel();
+    state.operation += 1;
+    if (root.RevisionPreview) root.RevisionPreview.clear();
     const keepList = Boolean(options && options.keepList);
     const edits = currentEdits();
     const applied = passesApi().apply(state.baseText, edits);
+    if (applied.ok && root.RevisionQuality && !root.RevisionQuality.termsPreserved(state.baseText, applied.text, state.context.terms)) {
+      applied.ok = false;
+      applied.warnings.push("Композиционные замены отменены: они затрагивают защищённые термины.");
+    }
     state.workingText = applied.ok ? applied.text : state.baseText;
     state.report = metricsApi().analyze(state.workingText, { genreId: genreId() });
 
@@ -428,13 +435,15 @@
       report: state.baseReport,
       discourseZone: zones.discourseShare,
     });
-    state.accepted = new Set(state.proposal.edits.filter((edit) => edit.accepted).map((edit) => edit.id));
+    state.accepted = new Set(state.context.keepReviewed ? [] : state.proposal.edits.filter((edit) => edit.accepted).map((edit) => edit.id));
     if (root.UsageBaseline) root.UsageBaseline.record(state.baseReport);
     rebuild();
   }
 
   function reset() {
     state.operation += 1;
+    if (root.PolishUI) root.PolishUI.cancel();
+    if (root.RevisionPreview) root.RevisionPreview.clear();
     state.baseText = "";
     state.baseReport = null;
     state.proposal = null;
@@ -458,100 +467,26 @@
    * предложений прежние спаны композиционных правок уже указывают не туда.
    */
   function polishWithModel() {
-    const selector = root.CandidateSelect;
-    if (!selector || !state.workingText) return;
-    if (root.NeuralScorerUI.lockForPolish && !root.NeuralScorerUI.lockForPolish()) {
-      nodes.editsGuard.classList.add("is-error");
-      nodes.editsGuard.textContent = "Дождитесь завершения текущей нейрооценки и повторите отбор формулировок.";
-      return;
-    }
-    const generate = root.Generator && typeof root.Generator.paraphrase === "function"
-      ? (sentence, options) => root.Generator.paraphrase(sentence, {
-        language: options && options.language,
-        count: 4,
-        position: options && options.position,
-        total: options && options.total,
-      })
-      : undefined;
+    if (!root.PolishUI || !state.workingText) return;
     const operation = state.operation;
-
-    nodes.polishButton.disabled = true;
-    const label = nodes.polishButton.textContent;
-    nodes.polishButton.textContent = "Глубокая редакция…";
-    nodes.editsGuard.classList.remove("is-error");
-    nodes.editsGuard.textContent =
-      "Модель распределённо перестраивает формулировки. Числа, ссылки, имена, язык и объём остаются под защитой.";
-
-    // Ранжировать перплексией имеет смысл только там, где модель есть. Одна
-    // оценка — два прохода модели, поэтому при включённом ранжировании число
-    // предложений за прогон урезается: двенадцать предложений со всеми их
-    // версиями — это сотни проходов, то есть минуты вместо секунд.
-    // Ранжирование подключается только к уже загруженным моделям. Тянуть
-    // гигабайт весов по нажатию кнопки, которая до сих пор отрабатывала за
-    // секунду и без сети, — не улучшение, а неожиданность.
-    const engine = root.NeuralScorerUI;
-    const warm = Boolean(engine && typeof engine.warm === "function" && engine.warm());
-    const ranker = warm && selector.hybridScorer ? selector.hybridScorer(state.report.language, engine) : null;
-    // Два бюджета, а не один: с ранжированием моделью каждая версия стоит двух
-    // проходов, и двенадцать предложений превращают секунды в минуты.
-    const budget = ranker ? { share: 0.15, limit: 5 } : { share: 0.35, limit: 12 };
-    selector
-      .polishSentences(state.workingText, {
-        language: state.report.language,
-        generate,
-        preferFresh: true,
-        share: budget.share,
-        limit: budget.limit,
-        score: ranker || undefined,
-      })
-      .then((result) => {
-        if (operation !== state.operation) return;
-        if (!result.ok) {
-          nodes.editsGuard.classList.add("is-error");
-          nodes.editsGuard.textContent = result.warnings.join(" ");
-          return;
-        }
-        if (!result.replaced) {
-          const warning = result.generatorWarnings && result.generatorWarnings[0];
-          nodes.editsGuard.classList.toggle("is-error", Boolean(warning));
-          nodes.editsGuard.textContent = warning
-            ? `Локальная модель не запустилась: ${warning}. Текст оставлен без изменений.`
-            : "Глубокая редакция не нашла достаточно отличающихся безопасных вариантов. Исходный смысл оставлен без риска.";
-          return;
-        }
-        const share = Math.round((result.changedWordShare || 0) * 100);
+    root.PolishUI.run({
+      text: state.workingText,
+      language: state.report.language,
+      isCurrent: () => operation === state.operation,
+      report(message, error) {
+        nodes.editsGuard.classList.toggle("is-error", Boolean(error));
+        nodes.editsGuard.textContent = message;
+      },
+      apply(result) {
         const deepRevision = {
-          replaced: result.replaced,
-          targeted: result.targeted,
-          totalSentences: result.totalSentences,
-          changedWordShare: result.changedWordShare,
+          replaced: result.replaced, targeted: result.targeted,
+          totalSentences: result.totalSentences, changedWordShare: result.changedWordShare,
         };
-        update(result.text, Object.assign({}, state.context, { deepRevision }));
-        nodes.editsGuard.textContent =
-          `Глубокая редакция: обновлено ${result.replaced} из ${result.totalSentences} предложений, охвачено около ${share}% слов. ` +
-          "Фактчек-гард сохранён." +
-          (result.generatorWarnings && result.generatorWarnings.length
-            ? ` Часть запросов модели завершилась ошибкой: ${result.generatorWarnings[0]}.`
-            : "");
-      })
-      .catch((error) => {
-        if (operation !== state.operation) return;
-        nodes.editsGuard.classList.add("is-error");
-        nodes.editsGuard.textContent = `Отбор не выполнен: ${error.message}`;
-      })
-      .then(() => {
-        if (root.Generator && typeof root.Generator.release === "function") root.Generator.release();
-        if (root.NeuralScorerUI && typeof root.NeuralScorerUI.reportProgress === "function") {
-          root.NeuralScorerUI.reportProgress({ done: true });
-        }
-        if (root.NeuralScorerUI && typeof root.NeuralScorerUI.unlockAfterPolish === "function") {
-          root.NeuralScorerUI.unlockAfterPolish();
-        }
-        nodes.polishButton.textContent = label;
-        nodes.polishButton.disabled = false;
-      });
+        update(result.text, Object.assign({}, state.context, { deepRevision, keepReviewed: true }));
+        nodes.editsGuard.textContent = `Применено ${result.replaced} выбранных замен. Числа и ссылки сверены.`;
+      },
+    });
   }
-
   function mount(handlers) {
     callbacks = handlers || {};
     nodes = {

@@ -12,6 +12,14 @@ global.Typography = require("./typography.js");
 
 const pipeline = require("./text-pipeline.js");
 
+test("protected terminology survives the common pipeline used by both modes", () => {
+  const source = "These measures facilitate collaboration between the teams.";
+  const protectedResult = pipeline.run(source, { terms: ["facilitate"] });
+  assert.equal(protectedResult.text, source);
+  assert.ok(protectedResult.warnings.some((s) => /защищённые термины/u.test(s)));
+  assert.notEqual(pipeline.run(source).text, source);
+});
+
 test("общий контур сохраняет полный словарный проход перед замкнутым циклом", () => {
   const source =
     "В современном мире важно отметить, что цифровизация оказывает существенное влияние на выручку — " +

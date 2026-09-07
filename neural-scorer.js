@@ -45,6 +45,7 @@
     lockedForPolish = true;
     if (worker) worker.terminate();
     worker = null;
+    modelsWarm = false;
     setBusy(false);
     return true;
   }
@@ -52,6 +53,14 @@
   function unlockAfterPolish() {
     lockedForPolish = false;
     setBusy(busy);
+  }
+
+  function cancelPolishScoring() {
+    if (!lockedForPolish) return;
+    if (worker) worker.terminate();
+    worker = null; modelsWarm = false;
+    for (const waiting of pending.values()) waiting.reject(new Error("Редактура остановлена."));
+    pending.clear();
   }
 
   function resetResult() {
@@ -99,7 +108,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker("neural-worker.js?v=19");
+    worker = new Worker("neural-worker.js?v=38");
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "progress") {
@@ -139,6 +148,8 @@
       if (message.type === "result" || message.type === "error") setBusy(false);
     });
     worker.addEventListener("error", (event) => {
+      if (worker) worker.terminate();
+      worker = null; modelsWarm = false;
       for (const waiting of pending.values()) {
         waiting.reject(new Error(event.message || "ошибка вычислительного модуля"));
       }
@@ -204,5 +215,6 @@
     reportProgress,
     lockForPolish,
     unlockAfterPolish,
+    cancelPolishScoring,
   };
 })(typeof globalThis !== "undefined" ? globalThis : window);

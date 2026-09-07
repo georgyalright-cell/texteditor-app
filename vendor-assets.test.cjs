@@ -31,13 +31,16 @@ test("production не загружает исполняемый код с вне
   const index = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
   const generator = fs.readFileSync(path.join(__dirname, "generator-worker.js"), "utf8");
   const scorer = fs.readFileSync(path.join(__dirname, "neural-worker.js"), "utf8");
+  const semantic = fs.readFileSync(path.join(__dirname, "semantic-worker.js"), "utf8");
   const webllm = fs.readFileSync(path.join(__dirname, "vendor", "webllm", "web-llm.mjs"), "utf8");
   const transformers = fs.readFileSync(
     path.join(__dirname, "vendor", "transformers", "transformers.web.min.mjs"),
     "utf8",
   );
   assert.doesNotMatch(index, /<script[^>]+src=["']https?:/iu);
-  assert.doesNotMatch(`${generator}\n${scorer}`, /(?:import|importScripts)\s*\([^)]*https?:/u);
+  assert.doesNotMatch(`${generator}\n${scorer}\n${semantic}`, /(?:import|importScripts)\s*\([^)]*https?:/u);
+  assert.match(semantic, /const REVISION = "[a-f0-9]{40}"/u);
+  assert.match(semantic, /if \(size > 128\) return null/u);
   assert.doesNotMatch(`${generator}\n${webllm}`, /(?:from|import)\s*[(']["']https?:/u);
   assert.doesNotMatch(transformers, /from["']onnxruntime-/u);
   assert.match(transformers, /from["']\.\/ort\.webgpu\.bundle\.min\.mjs["']/u);
@@ -45,7 +48,7 @@ test("production не загружает исполняемый код с вне
 
 test("глубокая редакция использует одну существующую кнопку и локальный генератор", () => {
   const index = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
-  const review = fs.readFileSync(path.join(__dirname, "review-ui.js"), "utf8");
+  const review = fs.readFileSync(path.join(__dirname, "polish-ui.js"), "utf8");
   assert.equal((index.match(/id=["']polishButton["']/gu) || []).length, 1);
   assert.match(review, /preferFresh:\s*true/u);
   assert.match(review, /share:\s*0\.35/u);

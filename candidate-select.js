@@ -231,12 +231,13 @@
     return Boolean(deep && deep.stableVocabulary(source, candidate, language));
   }
 
-  function freshCandidateProfile(source, candidate, language) {
+  function freshCandidateProfile(source, candidate, language, semanticVerified) {
     const deep = loadDeepRevision();
     const paraphraser = loadParaphraser();
     if (!deep) return { safe: false, novelty: 0, lengthRatio: 0, sameLanguage: false, stableVocabulary: false, naturalOpening: false, sentenceCount: 0 };
     return deep.candidateProfile(source, candidate, {
       language,
+      semanticVerified: semanticVerified === true,
       sentenceCount: sentenceSpansOf(candidate).length,
       detectLanguage: paraphraser ? (text) => paraphraser.detectLanguage(text) : null,
     });
@@ -340,11 +341,15 @@
       }
       let generatorWarning = "";
       const extra = settings.generate
-        ? Promise.resolve(settings.generate(original, {
+        ? Promise.resolve().then(() => {
+          if (settings.isCancelled && settings.isCancelled()) throw new Error("Редактура остановлена.");
+          return settings.generate(original, {
           language,
           position: targetIndex + 1,
           total: worst.length,
-        })).catch((error) => {
+          context: settings.contextual && globalThis.RevisionQuality ? globalThis.RevisionQuality.context(source, span) : undefined,
+          });
+        }).catch((error) => {
           generatorWarning = error instanceof Error ? error.message : "локальный генератор не ответил";
           return [];
         })
@@ -360,12 +365,13 @@
           accepted.push(value);
         }
         return accepted.length || generatorWarning || (Array.isArray(generated) && generated.length)
-          ? { span, original, variants: accepted, generatorWarning, reasons: spot.reasons }
+          ? { span, original, variants: accepted, generated: new Set(Array.isArray(generated) ? generated : []), generatorWarning, reasons: spot.reasons }
           : null;
       });
     });
 
     return Promise.all(prepared).then((resolved) => {
+      if (settings.isCancelled && settings.isCancelled()) throw new Error("Редактура остановлена.");
       const targets = resolved.filter(Boolean);
       if (!targets.length) {
         return {
@@ -380,13 +386,16 @@
           warnings: [],
         };
       }
-      return scoreAndReplace(source, targets, score, guard, settings, spans.length);
+      const review = globalThis.RevisionCandidates || (typeof require === "function" ? require("./revision-candidates.js") : null);
+      const prepared = settings.contextual && review ? review.prepare(targets, settings) : Promise.resolve(targets);
+      return prepared.then((ready) => scoreAndReplace(source, ready, score, guard, settings, spans.length));
     });
   }
 
   /** Пакетная оценка версий и замена тех предложений, где нашлось лучше. */
   function scoreAndReplace(source, targets, score, guard, options, totalSentences) {
     const settings = options || {};
+    if (settings.isCancelled && settings.isCancelled()) return Promise.reject(new Error("Редактура остановлена."));
     const generatorWarnings = [...new Set(targets.map((target) => target.generatorWarning).filter(Boolean))];
 
     // Один пакет на всё: оригиналы и версии подряд, границы запоминаются.
@@ -397,6 +406,7 @@
     }
 
     return Promise.resolve(score(batch)).then((scores) => {
+      if (settings.isCancelled && settings.isCancelled()) throw new Error("Редактура остановлена.");
       if (!Array.isArray(scores) || scores.length !== batch.length) {
         throw new Error("CandidateSelect: оценка вернула не столько значений, сколько вариантов.");
       }
@@ -409,9 +419,13 @@
           const value = Number(scores[target.offset + 1 + index]);
           if (!Number.isFinite(value)) continue;
           if (settings.preferFresh) {
-            const profile = freshCandidateProfile(target.original, target.variants[index], settings.language);
+            const text = target.variants[index];
+            const semanticVerified = Boolean(settings.preview && target.semantic && target.semantic.has(text));
+            const profile = freshCandidateProfile(target.original, text, settings.language, semanticVerified);
             if (!profile.safe || !Number.isFinite(baseline) || value > baseline + 4) continue;
-            const objective = value - profile.novelty * 30 + Math.abs(1 - profile.lengthRatio) * 6;
+            const style = globalThis.AuthorStyle || (typeof require === "function" ? require("./author-style.js") : null);
+            const stylePenalty = style && settings.authorProfile ? style.distance(text, settings.authorProfile) * 3 : 0;
+            const objective = value - profile.novelty * 30 + Math.abs(1 - profile.lengthRatio) * 6 + stylePenalty;
             if (!best || objective < best.objective) {
               best = { text: target.variants[index], score: value, objective, profile };
             }
@@ -430,6 +444,9 @@
           gain: Math.round(gain * 1000) / 1000,
           novelty: best.profile ? Math.round(best.profile.novelty * 1000) / 1000 : null,
           reasons: target.reasons,
+          start: target.span.start,
+          end: target.span.end,
+          requiresReview: Boolean(best.profile && !best.profile.stableVocabulary),
         });
       }
 
@@ -457,6 +474,7 @@
       const changedWords = details.reduce((sum, detail) => sum + wordTokens(detail.before, settings.language).length, 0);
       const totalWords = wordTokens(source, settings.language).length;
       return {
+        source,
         text: result,
         replaced: replacements.length,
         targeted: targets.length,

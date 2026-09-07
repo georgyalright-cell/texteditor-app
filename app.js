@@ -306,6 +306,7 @@
     const profile = window.FormatProfiles.get(profileId);
     if (window.ReviewUI) {
       window.ReviewUI.update(processed.text, {
+        terms: processed.terms || [],
         strictSections: profile.strictSections,
         headings: window.TextPipeline.headingCandidates(processed.text),
       });
@@ -402,7 +403,7 @@
     if (!elements.sourceText.value.trim()) return;
     try {
       const source = elements.sourceText.value;
-      const processed = window.TextPipeline.run(source);
+      const processed = window.TextPipeline.run(source, { terms: window.AuthorStyleUI ? window.AuthorStyleUI.snapshot().terms : [] });
       startReview(source, processed, currentMode === "project" ? "part" : "fragment", pipelineProfileId());
     } catch (error) {
       setResultState("Ошибка обработки", "error");
@@ -449,7 +450,7 @@
       return;
     }
     try {
-      const processed = window.TextPipeline.run(source);
+      const processed = window.TextPipeline.run(source, { terms: window.AuthorStyleUI ? window.AuthorStyleUI.snapshot().terms : [] });
       startReview(source, processed, "document", selectedProfileId());
     } catch (error) {
       setStatus(elements.resultNote, error instanceof Error ? error.message : "Не удалось собрать документ.", true);

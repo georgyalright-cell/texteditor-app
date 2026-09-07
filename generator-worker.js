@@ -1,6 +1,8 @@
 "use strict";
 
-import "./generator-core.js?v=21";
+import "./author-style.js?v=38";
+import "./business-english.js?v=38";
+import "./generator-core.js?v=38";
 import { CreateMLCEngine } from "./vendor/webllm/web-llm.mjs";
 
 const GENERATOR_MODEL = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
@@ -87,6 +89,7 @@ async function paraphrase(request) {
   try {
     const sentence = String(request.sentence || "").trim();
     if (!sentence) throw new Error("Предложение для перефразирования пусто.");
+    if (sentence.length > 1800) throw new Error("Предложение слишком длинное для локальной редакции.");
     const count = self.GeneratorCore.variantCount(request.count);
     const localEngine = await loadGenerator();
     const position = Number(request.position);
@@ -98,22 +101,27 @@ async function paraphrase(request) {
       progress: null,
       message: `Глубокая редакция${stage}: создаю ${count} варианта…`,
     });
-    const response = await localEngine.chat.completions.create({
+    const generate = (creative, variants) => localEngine.chat.completions.create({
       messages: self.GeneratorCore.buildMessages(sentence, {
+        ...request,
+        creative,
         language: request.language,
         count: 1,
       }),
       model: GENERATOR_MODEL,
-      n: count,
+      n: variants,
       max_tokens: MAX_NEW_TOKENS,
-      temperature: SAMPLING_TEMPERATURE,
+      temperature: request.contextual && !creative ? 0.4 : SAMPLING_TEMPERATURE,
       top_p: SAMPLING_TOP_P,
       repetition_penalty: 1.08,
       seed: samplingSeed(request.id),
     });
-    const raw = Array.isArray(response && response.choices)
+    const responses = request.contextual && request.creative && count > 1
+      ? [await generate(false, Math.ceil(count / 2)), await generate(true, Math.floor(count / 2))]
+      : [await generate(false, count)];
+    const raw = responses.flatMap((response) => Array.isArray(response && response.choices)
       ? response.choices.map((choice) => choice && choice.message && choice.message.content)
-      : [];
+      : []);
     const variants = self.GeneratorCore.parseVariants(raw, { sentence, count });
     send("variants", { id: request.id, variants });
   } catch (error) {

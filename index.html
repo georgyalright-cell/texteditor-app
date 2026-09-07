@@ -11,11 +11,13 @@
     />
     <meta name="referrer" content="no-referrer" />
     <title>TextEditor — обработка и сборка работ</title>
-    <link rel="stylesheet" href="styles.css?v=37" />
-    <link rel="stylesheet" href="workspace.css?v=37" />
-    <link rel="stylesheet" href="review.css?v=37" />
-    <link rel="stylesheet" href="neural-scorer.css?v=37" />
-    <link rel="stylesheet" href="help.css?v=37" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23108764'/%3E%3Cpath d='M8 9h16M16 9v15' stroke='white' stroke-width='3'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="styles.css?v=38" />
+    <link rel="stylesheet" href="workspace.css?v=38" />
+    <link rel="stylesheet" href="review.css?v=38" />
+    <link rel="stylesheet" href="neural-scorer.css?v=38" />
+    <link rel="stylesheet" href="help.css?v=38" />
+    <link rel="stylesheet" href="author-style.css?v=38" />
   </head>
   <body>
     <header class="site-header">
@@ -133,6 +135,35 @@
           </div>
         </details>
 
+        <details class="author-style">
+          <summary>Стиль текста · Business English B2–C1</summary>
+          <div class="author-style-body">
+            <p>Английская редактура ориентируется на ясный Business English B2–C1 и сохраняет формат работы. Это ориентир письма, а не сертификат уровня. Образцы British Council и принципы SEC уже подключены; свои тексты добавлять необязательно.</p>
+            <p>Ориентиры: <a href="https://learnenglish.britishcouncil.org/free-resources/writing/b2/report-working-abroad" target="_blank" rel="noopener noreferrer">отчёт B2</a>, <a href="https://learnenglish.britishcouncil.org/free-resources/writing/c1/report-research-study" target="_blank" rel="noopener noreferrer">отчёт C1</a>, <a href="https://www.sec.gov/pdf/handbook.pdf" target="_blank" rel="noopener noreferrer">SEC Plain English</a>.</p>
+            <label class="author-style-check"><input id="semanticEnabled" type="checkbox" checked />Предлагать более свободные формулировки с проверкой близости смысла. Дополнительная загрузка около 140 МБ, варианты нужно просмотреть.</label>
+            <label for="authorStyleText">Свой образец на русском или английском — от 200 слов и 8 предложений
+              <textarea id="authorStyleText" rows="4" maxlength="60000" placeholder="Вставьте текст, манеру которого хотите сохранить. Можно объединить несколько образцов одного языка."></textarea>
+            </label>
+            <div class="author-style-actions">
+              <button id="authorStyleSave" type="button" class="button button-secondary">Использовать образец</button>
+              <label class="file-button" for="authorStyleFiles">Загрузить образцы</label>
+              <input class="visually-hidden" type="file" id="authorStyleFiles" accept=".txt,.md,.docx,.pdf" multiple />
+              <label class="author-style-check"><input type="checkbox" id="authorStyleEnabled" />Учитывать мой профиль</label>
+            </div>
+            <p id="authorStyleStatus" role="status" aria-live="polite"></p>
+            <label for="authorTerms">Термины и названия, которые нельзя менять — по одному в строке, до 40
+              <textarea id="authorTerms" rows="2" maxlength="3240" placeholder="working capital&#10;customer retention"></textarea>
+            </label>
+            <p>Профиль и два коротких отрывка сохраняются только в этом браузере. Они подсказывают модели манеру письма; веса модели не дообучаются. Перед отправкой профиля коллеге проверьте, что отрывки не содержат закрытых сведений.</p>
+            <div class="author-style-actions">
+              <button id="authorStyleExport" type="button" class="text-button">Скачать профиль</button>
+              <label class="file-button" for="authorStyleImport">Открыть профиль</label>
+              <input class="visually-hidden" type="file" id="authorStyleImport" accept=".json" />
+              <button id="authorStyleForget" type="button" class="text-button">Удалить профиль и термины</button>
+            </div>
+          </div>
+        </details>
+
         <div class="editor-grid" id="fragmentWorkspace">
           <section class="editor-panel input-panel" aria-labelledby="source-title">
             <div class="panel-heading">
@@ -198,8 +229,9 @@
             Глубоко переработать формулировки
           </button>
           <p class="polish-download-note" id="polishDownloadNote" hidden>
-            Первый запуск: загрузка около 880 МБ и несколько минут ожидания. Затем модель останется в кэше браузера.
+            Первый запуск: около 880 МБ для редактора и 140 МБ для проверки смысла, несколько минут ожидания. Далее используется кэш. Все варианты можно просмотреть перед применением.
           </p>
+          <button class="button button-secondary" id="polishCancelButton" type="button" hidden>Остановить редактуру</button>
           <button class="button button-accent" id="addPartButton" type="button" disabled hidden>
             Добавить часть в работу
           </button>
@@ -216,6 +248,16 @@
             Очистить
           </button>
         </div>
+
+        <section class="revision-preview" id="revisionPreview" hidden aria-labelledby="revisionPreviewTitle">
+          <h2 id="revisionPreviewTitle">Предложенные формулировки</h2>
+          <p id="revisionPreviewNote" role="status"></p>
+          <ol id="revisionPreviewList"></ol>
+          <div class="author-style-actions">
+            <button class="button button-primary" id="revisionPreviewApply" type="button" disabled>Применить выбранные</button>
+            <button class="button button-secondary" id="revisionPreviewDiscard" type="button">Оставить текущий текст</button>
+          </div>
+        </section>
 
         <section class="parts-library" id="partsLibrary" hidden aria-labelledby="partsTitle">
           <div class="parts-heading">
@@ -322,7 +364,7 @@
             <li>собирает <code>.docx</code> с полями 2/2/3/1.5 см, Times New Roman 12 pt, интервалом 1.15 и нумерацией страниц.</li>
           </ul>
           <p>Содержание разделов не сочиняется. В режиме сборки инструмент объединяет только предоставленные материалы и явно отмечает всё, чего не хватает.</p>
-          <p>Глубокая редакция включается отдельной заметной кнопкой после базовой обработки и при первом запуске загружает генератор около 880 МБ. Подготовка может занять несколько минут. Затем модель остаётся в кэше и перестраивает формулировки примерно в трети подходящих предложений. Нейрооценка перплексии включается отдельно и загружает ещё около 1 ГБ. Браузер может удалить кэш при очистке данных или нехватке места.</p>
+          <p>Глубокая редакция учитывает соседний контекст и ориентир Business English B2–C1. Можно добавить собственный образец и защищённые термины. Генератор загружает около 880 МБ, проверка близости смысла — около 140 МБ. Подготовка может занять несколько минут. Варианты появляются для просмотра; выбранные замены попадают в TXT и DOCX. Нейрооценка перплексии включается отдельно и загружает ещё около 1 ГБ. Браузер может удалить кэш при очистке данных или нехватке места.</p>
         </div>
       </details>
     </main>
@@ -347,8 +389,9 @@
           <ol>
             <li>Вставьте черновик или выберите файл.</li>
             <li>Нажмите «Обработать текст».</li>
-            <li>Для заметно новой формулировки нажмите «Глубоко переработать формулировки». При первом запуске браузер загрузит около 880 МБ; подготовка может занять несколько минут.</li>
-            <li>Просмотрите результат и отчёт; при необходимости примите предложенные правки.</li>
+            <li>При желании раскройте «Стиль текста»: добавьте свой образец и термины. Встроенный ориентир Business English B2–C1 работает и без образцов.</li>
+            <li>Нажмите «Глубоко переработать формулировки». Первая загрузка — около 880 МБ + 140 МБ для сравнения смысла; несколько минут ожидания. Редактуру можно остановить.</li>
+            <li>Сравните предложенные формулировки, отметьте подходящие и нажмите «Применить выбранные». До этого исходный результат не меняется.</li>
             <li>Скачайте итог в DOCX или TXT.</li>
           </ol>
         </section>
@@ -359,7 +402,7 @@
           <ol>
             <li>Заполните паспорт работы.</li>
             <li>Выберите раздел, вставьте материал и обработайте его.</li>
-            <li>Нажмите «Добавить часть в работу» и повторите для остальных разделов.</li>
+            <li>При необходимости выполните глубокую редакцию и примените выбранные варианты. Затем нажмите «Добавить часть в работу» и повторите для остальных разделов.</li>
             <li>Закройте пункты готовности, соберите документ и скачайте DOCX.</li>
           </ol>
         </section>
@@ -375,37 +418,45 @@
       </p>
     </dialog>
 
-    <script src="vendor/mammoth/mammoth.browser.min.js?v=37" defer></script>
-    <script src="vendor/jszip/jszip.min.js?v=37" defer></script>
-    <script src="vendor/sheetjs/xlsx.full.min.js?v=37" defer></script>
-    <script src="format-profiles.js?v=37" defer></script>
-    <script src="typography.js?v=37" defer></script>
-    <script src="humanizer-metrics.js?v=37" defer></script>
-    <script src="anchor-guard.js?v=37" defer></script>
-    <script src="text-metrics.js?v=37" defer></script>
-    <script src="edit-passes.js?v=37" defer></script>
-    <script src="elicitation.js?v=37" defer></script>
-    <script src="revision-store.js?v=37" defer></script>
-    <script src="processor.js?v=37" defer></script>
-    <script src="paraphraser.js?v=37" defer></script>
-    <script src="rewriter.js?v=37" defer></script>
-    <script src="deep-revision.js?v=37" defer></script>
-    <script src="candidate-select.js?v=37" defer></script>
-    <script src="weak-spots.js?v=37" defer></script>
-    <script src="usage-baseline.js?v=37" defer></script>
-    <script src="humanizer-engine.js?v=37" defer></script>
-    <script src="text-pipeline.js?v=37" defer></script>
-    <script src="structurer.js?v=37" defer></script>
-    <script src="document-builder.js?v=37" defer></script>
-    <script src="docx-writer.js?v=37" defer></script>
-    <script src="document-reader.js?v=37" defer></script>
-    <script src="work-project.js?v=37" defer></script>
-    <script src="project-view.js?v=37" defer></script>
-    <script src="neural-scorer.js?v=37" defer></script>
-    <script src="generator-core.js?v=37" defer></script>
-    <script src="generator.js?v=37" defer></script>
-    <script src="review-ui.js?v=37" defer></script>
-    <script src="help-dialog.js?v=37" defer></script>
-    <script src="app.js?v=37" defer></script>
+    <script src="vendor/mammoth/mammoth.browser.min.js?v=38" defer></script>
+    <script src="vendor/jszip/jszip.min.js?v=38" defer></script>
+    <script src="vendor/sheetjs/xlsx.full.min.js?v=38" defer></script>
+    <script src="format-profiles.js?v=38" defer></script>
+    <script src="typography.js?v=38" defer></script>
+    <script src="humanizer-metrics.js?v=38" defer></script>
+    <script src="anchor-guard.js?v=38" defer></script>
+    <script src="text-metrics.js?v=38" defer></script>
+    <script src="edit-passes.js?v=38" defer></script>
+    <script src="elicitation.js?v=38" defer></script>
+    <script src="revision-store.js?v=38" defer></script>
+    <script src="processor.js?v=38" defer></script>
+    <script src="paraphraser.js?v=38" defer></script>
+    <script src="rewriter.js?v=38" defer></script>
+    <script src="deep-revision.js?v=38" defer></script>
+    <script src="candidate-select.js?v=38" defer></script>
+    <script src="weak-spots.js?v=38" defer></script>
+    <script src="usage-baseline.js?v=38" defer></script>
+    <script src="humanizer-engine.js?v=38" defer></script>
+    <script src="text-pipeline.js?v=38" defer></script>
+    <script src="structurer.js?v=38" defer></script>
+    <script src="document-builder.js?v=38" defer></script>
+    <script src="docx-writer.js?v=38" defer></script>
+    <script src="document-reader.js?v=38" defer></script>
+    <script src="work-project.js?v=38" defer></script>
+    <script src="project-view.js?v=38" defer></script>
+    <script src="neural-scorer.js?v=38" defer></script>
+    <script src="generator-core.js?v=38" defer></script>
+    <script src="generator.js?v=38" defer></script>
+    <script src="business-english.js?v=38" defer></script>
+    <script src="author-style.js?v=38" defer></script>
+    <script src="revision-quality.js?v=38" defer></script>
+    <script src="revision-candidates.js?v=38" defer></script>
+    <script src="semantic-scorer.js?v=38" defer></script>
+    <script src="author-style-ui.js?v=38" defer></script>
+    <script src="revision-preview.js?v=38" defer></script>
+    <script src="polish-ui.js?v=38" defer></script>
+    <script src="review-ui.js?v=38" defer></script>
+    <script src="help-dialog.js?v=38" defer></script>
+    <script src="app.js?v=38" defer></script>
   </body>
 </html>

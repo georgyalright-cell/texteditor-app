@@ -77,7 +77,7 @@
     return (guard.extractAnchors(text).length * 100) / words < LOOSE_ANCHOR_LIMIT;
   }
 
-  function run(text) {
+  function run(text, options) {
     const required = [
       root.TextProcessor,
       root.RuleParaphraser,
@@ -145,15 +145,23 @@
     const cleanedScore = root.HumanizerMetrics.scoreText(outcome.text, paraphrased.language).score;
     const finalScore = root.HumanizerMetrics.scoreText(humanized.text, paraphrased.language).score;
     const regressed = finalScore > cleanedScore;
-    const finalText = regressed ? outcome.text : humanized.text;
+    let finalText = regressed ? outcome.text : humanized.text;
     const guardWarnings = regressed
       ? ["Правки в сумме подняли оценку машинности, поэтому оставлен вычищенный исходник."]
       : [];
+    const terms = options && options.terms || [];
+    const quality = root.RevisionQuality || (typeof require === "function" ? require("./revision-quality.js") : null);
+    const termsChanged = terms.length && quality && !quality.termsPreserved(String(text), finalText, terms);
+    if (termsChanged) {
+      finalText = String(text);
+      guardWarnings.push("Базовые замены отменены: они затрагивали защищённые термины. Исходный текст сохранён.");
+    }
 
     return {
       text: finalText,
       language: humanized.language,
-      summary: summary(outcome.stats, paraphrased, humanized, typography.stats),
+      summary: termsChanged ? ["Защищённые термины сохранены; базовые замены не применены."] : summary(outcome.stats, paraphrased, humanized, typography.stats),
+      terms,
       metricsBefore: root.HumanizerMetrics.scoreText(outcome.text, paraphrased.language),
       warnings: [...outcome.warnings, ...paraphrased.warnings, ...humanized.warnings, ...guardWarnings],
     };

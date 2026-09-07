@@ -27,7 +27,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new root.Worker("generator-worker.js?v=34", { type: "module" });
+    worker = new root.Worker("generator-worker.js?v=38", { type: "module" });
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "progress") {
@@ -44,6 +44,7 @@
       const error = new Error(event.message || "Ошибка локального генератора.");
       rejectPending(error);
       report({ message: `Генератор недоступен: ${error.message}. Продолжаю со словарными версиями.`, isError: true });
+      if (worker) worker.terminate();
       worker = null;
     });
     return worker;
@@ -51,6 +52,12 @@
 
   function release() {
     if (worker && !pending.size) worker.postMessage({ type: "release" });
+  }
+
+  function cancel() {
+    if (worker) worker.terminate();
+    worker = null;
+    rejectPending(new Error("Редактура остановлена."));
   }
 
   function paraphrase(sentence, options) {
@@ -63,7 +70,7 @@
     const id = requestId;
     return new Promise((resolve, reject) => {
       pending.set(id, { resolve, reject });
-      ensureWorker().postMessage({
+      try { ensureWorker().postMessage({
         type: "paraphrase",
         id,
         sentence: source,
@@ -71,12 +78,17 @@
         count,
         position: Number(settings.position) || null,
         total: Number(settings.total) || null,
-      });
+        contextual: settings.contextual === true,
+        creative: settings.creative === true,
+        context: settings.context,
+        authorProfile: settings.authorProfile,
+        terms: settings.terms,
+      }); } catch (error) { pending.delete(id); reject(error); }
     }).catch((error) => {
       report({ message: `Генератор недоступен: ${error.message}. Продолжаю со словарными версиями.`, isError: true });
       throw error;
     });
   }
 
-  return { supported, paraphrase, release };
+  return { supported, paraphrase, release, cancel };
 });

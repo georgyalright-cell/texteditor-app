@@ -92,8 +92,11 @@
     const sentenceCount = Number(settings.sentenceCount) || 0;
     const stable = stableVocabulary(source, candidate, language);
     const naturalOpening = !startsWithNewFiniteVerb(source, candidate, language);
+    // New lexical proposals are edits, not summaries/expansions. Keep the old
+    // structural path unchanged; similarity alone can miss an omitted clause.
+    const lexicalEdit = settings.semanticVerified === true && lengthRatio >= 0.85 && lengthRatio <= 1.15;
     const safe = lengthRatio >= 0.68 && lengthRatio <= 1.38 && novelty >= 0.24 && novelty <= 0.74 &&
-      sameLanguage && stable && naturalOpening && sentenceCount > 0 && sentenceCount <= 2;
+      sameLanguage && (stable || lexicalEdit) && naturalOpening && sentenceCount > 0 && sentenceCount <= 2;
     return {
       safe,
       novelty,
@@ -113,6 +116,7 @@
   function lowerFirstCommon(value, language) {
     const text = String(value || "");
     if (!text || /^[A-ZА-ЯЁ]{2}/u.test(text)) return text;
+    if (language === "en" && !/^(?:The|A|An|This|These|That|Those|It|We|They|Our|Their|Your)\b/u.test(text)) return text;
     return text[0].toLocaleLowerCase(language === "ru" ? "ru" : "en") + text.slice(1);
   }
 
@@ -148,10 +152,32 @@
       if (parts.length === 2 && wordTokens(parts[0], language).length >= 2 && wordTokens(parts[1], language).length >= 2) {
         const secondVerb = findVerb(parts[1].trim());
         const connector = language === "ru" ? " и " : " and ";
-        if (secondVerb && secondVerb.index === 0) {
+        // A coordinator inside a modifier is not a pair of direct objects:
+        // "reduce costs by reviewing contracts and improving purchasing".
+        const nestedModifier = language === "en" && /\b(?:by|through|with|without|during|within|in|on|at|for|from|of|to)\b/iu.test(parts[0]);
+        if (nestedModifier) {
+          // Keep the entire modifier together; no guessed attachment tree.
+        } else if (secondVerb && secondVerb.index === 0) {
           push(`${subject} ${parts[1].trim()}${connector}${verb.word} ${parts[0].trim()}${punctuation}`);
         } else {
           push(`${subject} ${verb.word} ${parts[1].trim()}${connector}${parts[0].trim()}${punctuation}`);
+        }
+      }
+    }
+
+    // An explicit manner clause can move as a whole, including its own "and".
+    if (language === "en" && verb && !body.includes(",")) {
+      const clauses = [...body.matchAll(/\s+by\s+[a-z]+ing\b/giu)];
+      if (clauses.length === 1 && clauses[0].index > verb.index) {
+        const prefix = body.slice(0, clauses[0].index).trim();
+        const manner = body.slice(clauses[0].index).trim();
+        // Positive, deliberately small object grammar: "losses caused by
+        // rising costs" must NOT become "By rising costs, ... losses caused".
+        const object = body.slice(verb.index + verb.word.length, clauses[0].index).trim();
+        const simpleObject = /^(?:(?:the|its|their)\s+)?(?:(?:operating|operational|production|administrative|overall|total|customer|employee)\s+){0,2}(?:costs|losses|delays|efficiency|sales|revenue|productivity|retention|profits)$/iu.test(object);
+        if (wordTokens(prefix, language).length >= 4 && wordTokens(manner, language).length >= 3 &&
+            simpleObject && !/\b(?:who|which|that|because|when|if|where)\b/iu.test(prefix)) {
+          push(`${upperFirst(manner, language)}, ${lowerFirstCommon(prefix, language)}${punctuation}`);
         }
       }
     }
@@ -188,7 +214,8 @@
       .filter((item) => {
         const text = String(item.span && item.span.text || "").trim();
         const words = wordTokens(text, language).length;
-        return words >= 6 && words <= 80 && !/[\t|]/u.test(text) && syntacticReorderVariants(text, language).length > 0;
+        return words >= 6 && words <= 80 && !/[\t|]/u.test(text) &&
+          (settings.contextual === true && typeof settings.generate === "function" || syntacticReorderVariants(text, language).length > 0);
       });
     if (!eligible.length) return [];
 
