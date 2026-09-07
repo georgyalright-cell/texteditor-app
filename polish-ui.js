@@ -61,7 +61,8 @@
       clearTimeout(timer);
       if (operation !== sequence && options.isCurrent()) options.report("Редактура остановлена. Текущий текст сохранён.");
       if (root.Generator) root.Generator.release();
-      if (engine && engine.reportProgress) engine.reportProgress({ done: true });
+      if (engine && engine.reportProgress) engine.reportProgress({ done: true,
+        message: operation !== sequence ? "Редактура остановлена. Текущий текст сохранён." : "Локальный проход завершён. Итог и предупреждения — в отчёте о редактуре." });
       if (engine && engine.unlockAfterPolish) engine.unlockAfterPolish();
       button.textContent = label; button.disabled = !root.Generator.supported(); stop.hidden = true;
       active = false;

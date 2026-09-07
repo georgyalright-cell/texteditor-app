@@ -1,27 +1,26 @@
 "use strict";
-importScripts("./revision-quality.js?v=40");
+importScripts("./revision-quality.js?v=41");
+importScripts("./model-progress.js?v=41");
 
 const MODEL = "Xenova/paraphrase-multilingual-MiniLM-L12-v2";
 const REVISION = "2c4055b12046f11709e9df2c122e59ffbdc2f900";
 let extractor;
 let queue = Promise.resolve();
-const progress = (message) => self.postMessage({ type: "progress", message });
+const progress = (detail) => self.postMessage({ type: "progress", ...(typeof detail === "string" ? { message: detail } : detail) });
 
 async function load() {
   if (extractor) return;
-  const { pipeline, env } = await import("./vendor/transformers/transformers.web.min.mjs?v=40");
+  const { pipeline, env } = await import("./vendor/transformers/transformers.web.min.mjs?v=41");
   env.allowLocalModels = false;
   env.backends.onnx.wasm.numThreads = 1;
   env.backends.onnx.wasm.wasmPaths = {
     mjs: new URL("./vendor/transformers/ort-wasm-simd-threaded.asyncify.mjs", self.location.href).href,
     wasm: new URL("./vendor/transformers/ort-wasm-simd-threaded.asyncify.wasm", self.location.href).href,
   };
-  progress("Загружаю проверку близости смысла · около 140 МБ при первом запуске…");
+  progress("Проверка смысла · MiniLM · проверяю кэш. Первая загрузка — около 140 МБ…");
   extractor = await pipeline("feature-extraction", MODEL, {
     revision: REVISION, device: "wasm", dtype: "q8",
-    progress_callback: (event) => {
-      if (Number.isFinite(event.progress)) progress(`Проверка смысла · загрузка ${Math.round(event.progress)}%`);
-    },
+    progress_callback: (event) => progress(self.ModelProgress.transformers("Проверка смысла · MiniLM", event)),
   });
 }
 

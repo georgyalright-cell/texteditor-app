@@ -1,8 +1,9 @@
 "use strict";
 
-importScripts("./neural-scorer-core.js?v=40");
+importScripts("./neural-scorer-core.js?v=41");
+importScripts("./model-progress.js?v=41");
 
-const TRANSFORMERS_URL = "./vendor/transformers/transformers.web.min.mjs?v=40";
+const TRANSFORMERS_URL = "./vendor/transformers/transformers.web.min.mjs?v=41";
 const OBSERVER_MODEL = "onnx-community/Qwen2.5-0.5B-ONNX";
 const OBSERVER_REVISION = "edb2f22b84411a7990bd63bf64c6a471fbd13ecc";
 const PERFORMER_MODEL = "onnx-community/Qwen2.5-0.5B-Instruct-ONNX";
@@ -20,15 +21,7 @@ function send(type, detail) {
 }
 
 function progressReporter(stage) {
-  return (event) => {
-    const progress = Number.isFinite(event && event.progress) ? Math.round(event.progress) : null;
-    const filename = event && event.file ? String(event.file).split("/").pop() : "";
-    send("progress", {
-      stage,
-      progress,
-      message: `${stage}${filename ? ` · ${filename}` : ""}${progress === null ? "" : ` · ${progress}%`}`,
-    });
-  };
+  return (event) => send("progress", self.ModelProgress.transformers(stage, event));
 }
 
 async function loadModels(perplexityOnly) {
@@ -47,19 +40,19 @@ async function loadModels(perplexityOnly) {
     };
     if (!tokenizer) tokenizer = await transformers.AutoTokenizer.from_pretrained(OBSERVER_MODEL, {
       revision: OBSERVER_REVISION,
-      progress_callback: progressReporter("Токенизатор"),
+      progress_callback: progressReporter("Токенизатор · Qwen2.5"),
     });
     if (!observer) observer = await transformers.AutoModelForCausalLM.from_pretrained(OBSERVER_MODEL, {
       device: "webgpu",
       dtype: "q4f16",
       revision: OBSERVER_REVISION,
-      progress_callback: progressReporter("Базовая модель"),
+      progress_callback: progressReporter("Перплексия · Qwen2.5 0.5B"),
     });
     if (!perplexityOnly && !performer) performer = await transformers.AutoModelForCausalLM.from_pretrained(PERFORMER_MODEL, {
       device: "webgpu",
       dtype: "q4f16",
       revision: PERFORMER_REVISION,
-      progress_callback: progressReporter("Инструктивная модель"),
+      progress_callback: progressReporter("Binoculars · Qwen2.5 0.5B Instruct"),
     });
     send("ready", { fullPair: Boolean(performer), message: "Оценщик готов. Файлы обычно сохранены в кэше браузера." });
   })();
@@ -146,7 +139,7 @@ async function scoreBatch(texts, fullText, perplexityOnly) {
   for (let index = 0; index < texts.length; index += 1) {
     send("progress", {
       stage: "Отбор",
-      progress: index / texts.length,
+      progress: 100 * index / texts.length,
       message: `Оцениваю вариант ${index + 1} из ${texts.length}…`,
     });
     if (!cache.has(texts[index])) cache.set(texts[index], await scoreText(texts[index], `вариант ${index + 1}`, fullText, perplexityOnly));

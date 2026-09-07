@@ -12,12 +12,12 @@
     <meta name="referrer" content="no-referrer" />
     <title>TextEditor — обработка и сборка работ</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23108764'/%3E%3Cpath d='M8 9h16M16 9v15' stroke='white' stroke-width='3'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="styles.css?v=40" />
-    <link rel="stylesheet" href="workspace.css?v=40" />
-    <link rel="stylesheet" href="review.css?v=40" />
-    <link rel="stylesheet" href="neural-scorer.css?v=40" />
-    <link rel="stylesheet" href="help.css?v=40" />
-    <link rel="stylesheet" href="revision-preview.css?v=40" />
+    <link rel="stylesheet" href="styles.css?v=41" />
+    <link rel="stylesheet" href="workspace.css?v=41" />
+    <link rel="stylesheet" href="review.css?v=41" />
+    <link rel="stylesheet" href="neural-scorer.css?v=41" />
+    <link rel="stylesheet" href="help.css?v=41" />
+    <link rel="stylesheet" href="revision-preview.css?v=41" />
   </head>
   <body>
     <header class="site-header">
@@ -220,6 +220,13 @@
           </button>
         </div>
 
+        <section class="model-load-status" id="modelLoadStatus" hidden aria-labelledby="modelLoadTitle">
+          <h3 id="modelLoadTitle">Локальные модели — ход работы</h3>
+          <p class="neural-status" id="neuralStatus" role="status" aria-live="polite" aria-atomic="true"></p>
+          <progress class="neural-progress" id="neuralProgress" max="100" aria-label="Прогресс текущего файла или этапа" hidden></progress>
+          <p class="model-load-hint">Процент относится к текущему файлу или этапу, не ко всему проходу. После получения файлов модель ещё готовится в памяти. Кэш обычно избавляет от повторного скачивания.</p>
+        </section>
+
         <section class="revision-preview" id="revisionPreview" hidden aria-labelledby="revisionPreviewTitle">
           <h2 id="revisionPreviewTitle">Предложенные формулировки</h2>
           <p id="revisionPreviewNote" role="status"></p>
@@ -308,12 +315,11 @@
               Две небольшие языковые модели сравнят исходник и результат по реальной перплексии и Binoculars.
               Отдельная инструктивная модель создаёт варианты для кнопки отбора формулировок.
               Текст остаётся на устройстве; сервер и ключи не нужны.
+              Первая загрузка отдельной диагностики — около 1 ГБ; уже сохранённые модели используются из кэша.
             </p>
           </div>
           <button class="button button-secondary neural-action" id="neuralScoreButton" type="button">Загрузить и оценить</button>
         </div>
-        <progress class="neural-progress" id="neuralProgress" max="100" hidden></progress>
-        <p class="neural-status" id="neuralStatus" role="status" aria-live="polite"></p>
         <div class="neural-results" id="neuralResults" hidden></div>
         <p class="neural-result-note" id="neuralResultNote"></p>
       </section>
@@ -390,44 +396,44 @@
       </p>
     </dialog>
 
-    <script src="vendor/mammoth/mammoth.browser.min.js?v=40" defer></script>
-    <script src="vendor/jszip/jszip.min.js?v=40" defer></script>
-    <script src="vendor/sheetjs/xlsx.full.min.js?v=40" defer></script>
-    <script src="format-profiles.js?v=40" defer></script>
-    <script src="typography.js?v=40" defer></script>
-    <script src="humanizer-metrics.js?v=40" defer></script>
-    <script src="anchor-guard.js?v=40" defer></script>
-    <script src="text-metrics.js?v=40" defer></script>
-    <script src="edit-passes.js?v=40" defer></script>
-    <script src="elicitation.js?v=40" defer></script>
-    <script src="revision-store.js?v=40" defer></script>
-    <script src="processor.js?v=40" defer></script>
-    <script src="paraphraser.js?v=40" defer></script>
-    <script src="rewriter.js?v=40" defer></script>
-    <script src="deep-revision.js?v=40" defer></script>
-    <script src="candidate-select.js?v=40" defer></script>
-    <script src="weak-spots.js?v=40" defer></script>
-    <script src="usage-baseline.js?v=40" defer></script>
-    <script src="humanizer-engine.js?v=40" defer></script>
-    <script src="text-pipeline.js?v=40" defer></script>
-    <script src="structurer.js?v=40" defer></script>
-    <script src="document-builder.js?v=40" defer></script>
-    <script src="docx-writer.js?v=40" defer></script>
-    <script src="document-reader.js?v=40" defer></script>
-    <script src="work-project.js?v=40" defer></script>
-    <script src="project-view.js?v=40" defer></script>
-    <script src="neural-scorer.js?v=40" defer></script>
-    <script src="generator-core.js?v=40" defer></script>
-    <script src="generator.js?v=40" defer></script>
-    <script src="business-english.js?v=40" defer></script>
-    <script src="revision-quality.js?v=40" defer></script>
-    <script src="revision-candidates.js?v=40" defer></script>
-    <script src="semantic-scorer.js?v=40" defer></script>
-    <script src="revision-preview.js?v=40" defer></script>
-    <script src="neural-ranking.js?v=40" defer></script>
-    <script src="polish-ui.js?v=40" defer></script>
-    <script src="review-ui.js?v=40" defer></script>
-    <script src="help-dialog.js?v=40" defer></script>
-    <script src="app.js?v=40" defer></script>
+    <script src="vendor/mammoth/mammoth.browser.min.js?v=41" defer></script>
+    <script src="vendor/jszip/jszip.min.js?v=41" defer></script>
+    <script src="vendor/sheetjs/xlsx.full.min.js?v=41" defer></script>
+    <script src="format-profiles.js?v=41" defer></script>
+    <script src="typography.js?v=41" defer></script>
+    <script src="humanizer-metrics.js?v=41" defer></script>
+    <script src="anchor-guard.js?v=41" defer></script>
+    <script src="text-metrics.js?v=41" defer></script>
+    <script src="edit-passes.js?v=41" defer></script>
+    <script src="elicitation.js?v=41" defer></script>
+    <script src="revision-store.js?v=41" defer></script>
+    <script src="processor.js?v=41" defer></script>
+    <script src="paraphraser.js?v=41" defer></script>
+    <script src="rewriter.js?v=41" defer></script>
+    <script src="deep-revision.js?v=41" defer></script>
+    <script src="candidate-select.js?v=41" defer></script>
+    <script src="weak-spots.js?v=41" defer></script>
+    <script src="usage-baseline.js?v=41" defer></script>
+    <script src="humanizer-engine.js?v=41" defer></script>
+    <script src="text-pipeline.js?v=41" defer></script>
+    <script src="structurer.js?v=41" defer></script>
+    <script src="document-builder.js?v=41" defer></script>
+    <script src="docx-writer.js?v=41" defer></script>
+    <script src="document-reader.js?v=41" defer></script>
+    <script src="work-project.js?v=41" defer></script>
+    <script src="project-view.js?v=41" defer></script>
+    <script src="neural-scorer.js?v=41" defer></script>
+    <script src="generator-core.js?v=41" defer></script>
+    <script src="generator.js?v=41" defer></script>
+    <script src="business-english.js?v=41" defer></script>
+    <script src="revision-quality.js?v=41" defer></script>
+    <script src="revision-candidates.js?v=41" defer></script>
+    <script src="semantic-scorer.js?v=41" defer></script>
+    <script src="revision-preview.js?v=41" defer></script>
+    <script src="neural-ranking.js?v=41" defer></script>
+    <script src="polish-ui.js?v=41" defer></script>
+    <script src="review-ui.js?v=41" defer></script>
+    <script src="help-dialog.js?v=41" defer></script>
+    <script src="app.js?v=41" defer></script>
   </body>
 </html>

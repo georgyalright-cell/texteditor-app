@@ -8,6 +8,7 @@
     progress: document.querySelector("#neuralProgress"),
     results: document.querySelector("#neuralResults"),
     note: document.querySelector("#neuralResultNote"),
+    loadStatus: document.querySelector("#modelLoadStatus"),
   };
   let texts = { source: "", result: "" };
   let worker = null;
@@ -28,10 +29,11 @@
 
   function reportProgress(message) {
     const detail = message || {};
-    setStatus(detail.message, detail.isError);
+    elements.loadStatus.hidden = false;
+    setStatus(detail.message || (detail.done ? "Работа моделей завершена. Итог — в отчёте о редактуре." : "Подготовка локальной модели…"), detail.isError);
     elements.progress.hidden = Boolean(detail.done) || !detail.message;
     if (elements.progress.hidden || !Number.isFinite(detail.progress)) elements.progress.removeAttribute("value");
-    else elements.progress.value = detail.progress;
+    else elements.progress.value = Math.max(0, Math.min(100, detail.progress));
   }
 
   function setBusy(value) {
@@ -46,6 +48,7 @@
     if (worker) worker.terminate();
     worker = null;
     modelsWarm = false;
+    reportProgress({ message: "Глубокая редакция · проверяю кэш и готовлю модели…" });
     setBusy(false);
     return true;
   }
@@ -59,6 +62,7 @@
     if (!lockedForPolish) return;
     if (worker) worker.terminate();
     worker = null; modelsWarm = false;
+    reportProgress({ done: true, message: "Редактура остановлена. Текущий текст сохранён." });
     for (const waiting of pending.values()) waiting.reject(new Error("Редактура остановлена."));
     pending.clear();
   }
@@ -108,7 +112,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker("neural-worker.js?v=40");
+    worker = new Worker("neural-worker.js?v=41");
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "progress") {
@@ -166,9 +170,10 @@
     contentVersion += 1;
     elements.panel.hidden = !texts.result;
     resetResult();
+    if (!busy && !lockedForPolish) elements.loadStatus.hidden = true;
     if (!texts.result) return;
     if (!supported()) {
-      setStatus("WebGPU недоступен. Обычная обработка продолжает работать без нейромоделей.", true);
+      reportProgress({done:true,isError:true,message:"WebGPU недоступен. Обычная обработка продолжает работать без нейромоделей."});
     } else {
       setStatus(
         "Оценка при первом запуске загрузит около 1 ГБ. Генератор формулировок — ещё около 880 МБ только при его запуске.",
@@ -182,6 +187,8 @@
     if (busy || lockedForPolish || !texts.result || !supported()) return;
     resetResult();
     setBusy(true);
+    reportProgress({ message: "Нейрооценка · проверяю кэш и готовлю модели…" });
+    elements.loadStatus.scrollIntoView({block:"nearest",behavior:"smooth"});
     requestId += 1;
     activeVersion = contentVersion;
     ensureWorker().postMessage({ type: "score", id: requestId, ...texts });

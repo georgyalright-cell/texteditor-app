@@ -1,8 +1,9 @@
 "use strict";
 
-import "./author-style.js?v=40";
-import "./business-english.js?v=40";
-import "./generator-core.js?v=40";
+import "./author-style.js?v=41";
+import "./business-english.js?v=41";
+import "./generator-core.js?v=41";
+import "./model-progress.js?v=41";
 import { CreateMLCEngine } from "./vendor/webllm/web-llm.mjs";
 
 const GENERATOR_MODEL = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
@@ -50,13 +51,7 @@ function samplingSeed(requestId) {
 }
 
 function progressReporter(report) {
-  const raw = Number(report && report.progress);
-  const progress = Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw * 100))) : null;
-  const detail = String((report && report.text) || "").replace(/\s+/gu, " ").trim();
-  send("progress", {
-    progress,
-    message: `Генератор · первая загрузка и подготовка${progress === null ? "" : ` · ${progress}%`}${detail ? ` · ${detail}` : ""}`,
-  });
+  send("progress", self.ModelProgress.generator(report));
 }
 
 async function loadGenerator() {
@@ -65,7 +60,7 @@ async function loadGenerator() {
   loading = (async () => {
     send("progress", {
       progress: null,
-      message: "Подключаю локальный генератор. При первом запуске нужно скачать около 880 МБ…",
+      message: "Генератор · Qwen2.5 1.5B · проверяю кэш и подключаю модель. Первая загрузка — около 880 МБ…",
     });
     engine = await CreateMLCEngine(GENERATOR_MODEL, {
       appConfig: APP_CONFIG,
