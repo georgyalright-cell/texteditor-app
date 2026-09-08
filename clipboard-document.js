@@ -36,19 +36,28 @@
     // No imported node or attribute is ever mounted into the live document.
     const template = doc.createElement("template"); template.innerHTML = html;
     if (template.content.querySelectorAll("*").length > 15000) throw new Error("Слишком сложная вставка (больше 15 000 элементов).");
-    const blocks = [], warnings = new Set(); let pending = "";
+    const blocks = [], warnings = new Set(); let pending = "", ownerId = 0;
     const flush = () => {
       const text = pending.replace(/[ \t]+/gu, " ").trim(); pending = "";
       if (text) blocks.push({ type: "paragraph", text });
     };
-    const visit = (node, depth = 0) => {
+    const visit = (node, depth = 0, owner) => {
       if (depth > 80) throw new Error("Слишком глубоко вложенная разметка.");
       if (node.nodeType === 3) { pending += node.textContent; return; }
       if (node.nodeType !== 1) return;
       const tag = node.tagName;
       if (UNSUPPORTED.test(tag)) { warnings.add("Активные элементы, формулы и мультимедиа не импортируются. Проверьте исходник."); return; }
       if (tag === "BR") { pending += "\n"; return; }
-      if (tag === "IMG") { flush(); blocks.push(image(node.getAttribute("src"), node.getAttribute("alt"))); return; }
+      if (tag === "FIGURE") {
+        if (node.querySelectorAll("img, table").length > 1) throw new Error("Составной рисунок с несколькими фото/таблицами пока не поддерживается. Вставьте его одним PNG/JPEG или разделите на отдельные объекты с подписями.");
+        flush(); const figureOwner = ++ownerId;
+        for (const child of node.childNodes) visit(child, depth + 1, figureOwner);
+        flush(); return;
+      }
+      if (tag === "IMG") { flush(); blocks.push({ ...image(node.getAttribute("src"), node.getAttribute("alt")), ...(owner !== undefined ? { layoutOwner: owner } : {}) }); return; }
+      if (tag === "FIGCAPTION") {
+        flush(); blocks.push({ ...root.DocumentLayout.caption(contentText(node).trim(), "figure"), ...(owner !== undefined ? { layoutOwner: owner } : {}) }); return;
+      }
       if (tag === "TABLE") {
         flush();
         if (node.querySelector("table, img, svg, math")) throw new Error("Вложенные таблицы, формулы и фото внутри ячеек пока не поддерживаются. Вынесите их отдельными блоками.");
@@ -57,8 +66,9 @@
         const matrix = rows.filter((row) => row.length).map((row) => row.map((cell) => contentText(cell).trim()));
         if (!matrix.length) return;
         if (matrix.length > 1000 || matrix[0].length > 30 || matrix.some((row) => row.length !== matrix[0].length)) throw new Error("Нужна прямоугольная таблица до 1000 строк и 30 столбцов.");
-        const caption = node.querySelector("caption"); if (caption) blocks.push({ type: "paragraph", text: caption.textContent.trim() });
-        blocks.push({ type: "docTable", columns: matrix[0], rows: matrix.slice(1) }); return;
+        const caption = node.querySelector("caption"), tableOwner = ++ownerId;
+        if (caption) blocks.push({ ...root.DocumentLayout.caption(contentText(caption).trim(), "table"), layoutOwner: tableOwner });
+        blocks.push({ type: "docTable", columns: matrix[0], rows: matrix.slice(1), layoutOwner: tableOwner }); return;
       }
       if (/^H[1-6]$/u.test(tag)) {
         flush(); if (node.querySelector("img")) throw new Error("Вынесите фото из заголовка отдельным блоком.");
@@ -79,7 +89,7 @@
         return;
       }
       const boundary = BLOCK_TAGS.test(tag); if (boundary) flush();
-      for (const child of node.childNodes) visit(child, depth + 1);
+      for (const child of node.childNodes) visit(child, depth + 1, owner);
       if (tag === "A") {
         const href = node.getAttribute("href") || "";
         if (/^https?:\/\//iu.test(href) && href !== node.textContent.trim()) pending += ` (${href})`;
@@ -105,14 +115,14 @@
     const photos = [];
     for (const file of files) { photos.push(await fileImage(file)); root.DocumentImages.validate(photos); }
     const missing = result.blocks.map((block, i) => block.type === "imageMissing" ? i : -1).filter((i) => i >= 0);
-    if (missing.length === 1 && photos.length === 1) result.blocks[missing[0]] = photos[0];
+    if (missing.length === 1 && photos.length === 1) result.blocks[missing[0]] = { ...result.blocks[missing[0]], ...photos[0] };
     else if (!result.blocks.length) result.blocks.push(...photos);
     else if (photos.some((photo) => !result.blocks.some((block) => block.type === "image" && block.dataUrl === photo.dataUrl))) throw new Error("Не удалось однозначно расположить фото из буфера. Вставьте материал без файлов и прикрепите фото на отмеченные места.");
     if (!result.blocks.length) throw new Error("В буфере нет поддерживаемого текста, таблиц или фото.");
     validate(result.blocks);
     for (const [index, block] of result.blocks.entries()) if (block.type === "image") {
       try { await root.DocumentImages.decode(block.dataUrl); }
-      catch (_) { result.blocks[index] = { type: "imageMissing", alt: block.alt || "Повреждённое фото" }; }
+      catch (_) { const { dataUrl, ...rest } = block; result.blocks[index] = { ...rest, type: "imageMissing", alt: block.alt || "Повреждённое фото" }; }
     }
     return result;
   }
@@ -121,6 +131,10 @@
     if (node.nodeType !== 1 || UNSUPPORTED.test(node.tagName)) return "";
     if (node.tagName === "BR") return "\n";
     const text = Array.from(node.childNodes, contentText).join("");
+    if (node.tagName === "A") {
+      const href = node.getAttribute("href") || "";
+      return /^https?:\/\//iu.test(href) && href !== text.trim() ? `${text} (${href})` : text;
+    }
     return /^(P|DIV|LI|PRE)$/u.test(node.tagName) ? text + "\n" : text;
   }
   function listNumber(node) {
@@ -146,6 +160,7 @@
   function textOf(blocks) {
     return blocks.map((block) => {
       if (block.type === "heading") return block.title;
+      if (block.type === "caption") return `${block.prefix || (block.kind === "figure" ? "Figure" : "Table")} ${block.number || ""}${block.title ? `. ${block.title}` : ""}`.trim();
       if (block.type === "image" || block.type === "imageMissing") return `[Фото: ${block.alt}]`;
       if (block.type === "docTable") return [block.columns, ...block.rows].map((row) => row.join("\t")).join("\n");
       return block.text || (block.lines || []).join("\n") || block.title || "";

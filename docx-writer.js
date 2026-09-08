@@ -55,10 +55,13 @@
   function paragraphXml(text, options) {
     const settings = options || {};
     // Порядок элементов внутри w:pPr задан схемой OOXML (CT_PPr):
-    // pStyle, pageBreakBefore, spacing, ind, jc, outlineLvl.
+    // pStyle, keepNext, keepLines, pageBreakBefore, widowControl, spacing, ind, jc, outlineLvl.
     const properties = [];
     if (settings.style) properties.push(`<w:pStyle w:val="${settings.style}"/>`);
+    if (settings.keepNext) properties.push("<w:keepNext/>");
+    if (settings.keepLines) properties.push("<w:keepLines/>");
     if (settings.pageBreakBefore) properties.push("<w:pageBreakBefore/>");
+    properties.push("<w:widowControl/>");
     if (settings.spacingAfterTwips !== undefined || settings.lineTwips !== undefined) {
       const after = settings.spacingAfterTwips !== undefined ? ` w:after="${settings.spacingAfterTwips}"` : "";
       const line = settings.lineTwips !== undefined ? ` w:line="${settings.lineTwips}" w:lineRule="auto"` : "";
@@ -164,10 +167,11 @@
         lineTwips: lineSpacingToTwips(layout.body.lineSpacing),
         spacingAfterTwips: 0,
         bold: settings.bold,
+        keepNext: settings.header && data.rows.length > 0,
       });
       return (
         `<w:tc><w:tcPr><w:tcW w:w="${columnWidths[columnIndex]}" w:type="dxa"/>` +
-        `<w:vAlign w:val="center"/>${settings.header ? '<w:shd w:val="clear" w:color="auto" w:fill="EAF0FA"/>' : ""}` +
+        `${settings.header ? '<w:shd w:val="clear" w:color="auto" w:fill="EAF0FA"/>' : ""}<w:vAlign w:val="center"/>` +
         `</w:tcPr>${paragraph}</w:tc>`
       );
     }
@@ -186,15 +190,22 @@
           return cell(value, index, { alignment: numeric ? "center" : "left" });
         });
         while (cells.length < columnCount) cells.push(cell("", cells.length));
-        return `<w:tr>${cells.join("")}</w:tr>`;
+        // Only short rows stay intact. Large narrative cells must be allowed
+        // to flow across pages rather than overflow or leave a blank page.
+        const short = row.every((value, i) => {
+          const chars = Math.max(1, Math.floor((columnWidths[i] - 200) / (layout.font.sizePt * 11)));
+          return String(value).split("\n").reduce((n, line) => n + Math.max(1, Math.ceil(line.length / chars)), 0) <= 8;
+        });
+        return `<w:tr>${short ? '<w:trPr><w:cantSplit/></w:trPr>' : ""}${cells.join("")}</w:tr>`;
       })
       .join("");
 
     return (
       `<w:tbl><w:tblPr><w:tblW w:w="${totalTwips}" w:type="dxa"/>` +
+      borders +
       '<w:tblCellMar><w:top w:w="80" w:type="dxa"/><w:left w:w="100" w:type="dxa"/>' +
       '<w:bottom w:w="80" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar>' +
-      `${borders}</w:tblPr>` +
+      '</w:tblPr>' +
       `${grid}${headerRow}${bodyRows}</w:tbl>`
     );
   }
@@ -238,6 +249,8 @@
       return [
         paragraphXml(headingLabel(block, profile), {
           style: isTopLevel ? "SectionHeading" : "SubsectionHeading",
+          keepNext: true,
+          keepLines: true,
           alignment: layout.heading.alignment,
           indentTwips: FormatProfiles.cmToTwips(layout.heading.firstLineIndentCm),
           lineTwips: lineSpacingToTwips(layout.heading.lineSpacing),
@@ -289,6 +302,7 @@
           lineTwips,
           spacingAfterTwips: 0,
           italic: true,
+          keepLines: block.text.length <= 500,
         }),
       ];
     }
@@ -298,6 +312,8 @@
       return [
         paragraphXml(label, {
           style: "Caption",
+          keepNext: (block.position || profile.captions[block.kind].position) === "above",
+          keepLines: label.length <= 500,
           alignment: block.alignment || profile.captions[block.kind].alignment,
           indentTwips: 0,
           lineTwips,

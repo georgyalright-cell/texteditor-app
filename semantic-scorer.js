@@ -13,7 +13,7 @@
     if (!pairs.length) return Promise.resolve([]);
     return new Promise((resolve, reject) => {
       if (!worker) {
-        worker = new root.Worker("semantic-worker.js?v=45");
+        worker = new root.Worker("semantic-worker.js?v=46");
         worker.onmessage = ({ data }) => {
           if (data.type === "progress") { if (root.NeuralScorerUI) root.NeuralScorerUI.reportProgress(data); return; }
           const item = pending.get(data.id);

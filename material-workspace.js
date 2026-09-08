@@ -65,15 +65,39 @@
         try {
           const picture = await root.ClipboardDocument.fileImage(file);
           if (operation !== generation) return;
-          const next = source.slice(); next[index] = picture; root.ClipboardDocument.validate(next);
-          invalidate(true); source = next; if (processed) processed[index] = picture; save(); display(); summary();
+          const next = source.slice(); next[index] = { ...source[index], ...picture }; root.ClipboardDocument.validate(next);
+          invalidate(true); source = next; if (processed) processed[index] = next[index]; save(); display(); summary();
         } catch (error) { if (operation === generation) report(error.message, true); }
         finally { if (ticket === pasteRevision) pendingPaste = false; options.update(); }
       }, (index) => {
-        if (!root.confirm("Удалить это место фотографии из документа?")) return;
-        invalidate(true); source.splice(index, 1); if (processed) processed.splice(index, 1); save(); display(); summary();
-      });
+        if (!root.confirm("Удалить это место фотографии вместе с его подписью и строкой источника?")) return;
+        const group = root.DocumentLayout.units(source).find((u) => u.index === index);
+        invalidate(true);
+        for (const i of group.indices.slice().reverse()) { source.splice(i, 1); if (processed) processed.splice(i, 1); }
+        save(); display(); summary();
+      }, { profile: root.FormatProfiles.get(options.profile()), edit: editLayout });
       e.sourceText.value = root.ClipboardDocument.textOf(source); options.update(); controls();
+    }
+    function editLayout(index, action, value) {
+      const order = action === "move" ? root.DocumentLayout.move(source, index, value) : null;
+      if (action === "move" && !order) return;
+      invalidate(true);
+      if (order) {
+        source[index].manualPlacement = true;
+        if (processed) processed[index].manualPlacement = true;
+        source = order.map((i) => source[i]); if (processed) processed = order.map((i) => processed[i]);
+      } else {
+        source[index].layoutTitle = value.slice(0, 500);
+        if (processed) processed[index].layoutTitle = source[index].layoutTitle;
+      }
+      save(); if (order) display();
+      if (processed) assemble(processed);
+      if (order) report("Размещение и подпись сохранены. Принятые правки текста сохранены; неподтверждённые предложения сброшены.");
+    }
+    function acceptImport(imported) {
+      const layout = root.DocumentLayout.arrange(imported.blocks);
+      source = layout.blocks; notes = [...imported.warnings, ...layout.warnings];
+      if (layout.moved) notes.push(`По явным ссылкам в тексте размещено объектов: ${layout.moved}. Проверьте расположение ниже.`);
     }
     function summary() {
       const tables = source.filter((b) => b.type === "docTable" || b.type === "table").length;
@@ -83,6 +107,7 @@
     }
     async function paste(event) {
       if (!active() || !event.clipboardData) return;
+      if (event.target !== e.sourceText && event.target.closest("input, textarea")) return;
       event.preventDefault();
       if (source.length && !root.confirm("Заменить текущий документ материалом из буфера?")) return;
       contentRevision++;
@@ -94,13 +119,14 @@
       try {
         const imported = await root.ClipboardDocument.read({ getData: (type) => type === "text/html" ? html : text, files }, document);
         if (generation !== operation) return;
-        invalidate(); source = imported.blocks; notes = imported.warnings; save(); display(); summary();
+        invalidate(); acceptImport(imported); save(); display(); summary();
       } catch (error) { if (generation === operation) report(`Вставка не применена, прежний материал сохранён. ${error.message}`, true); }
       finally { if (ticket === pasteRevision) pendingPaste = false; options.update(); }
     }
     function assemble(blocks) {
       root.DocumentImages.validate(blocks);
-      const assembled = root.DocumentBuilder.assemble({ blocks, text: root.ClipboardDocument.textOf(blocks),
+      const arranged = root.DocumentLayout.present(blocks, root.FormatProfiles.get(options.profile()));
+      const assembled = root.DocumentBuilder.assemble({ blocks: arranged, text: root.ClipboardDocument.textOf(arranged),
         preserveOrder: true, profileId: options.profile(), metadata: options.metadata() });
       options.result(assembled, changed);
       return assembled;
@@ -126,7 +152,7 @@
         try {
           const imported = await root.ClipboardDocument.read({ getData: (type) => type === "text/plain" ? text : "", files: [] }, document);
           if (generation !== importGeneration) return;
-          source = imported.blocks; notes = imported.warnings; display(); save();
+          acceptImport(imported); display(); save();
         } catch (error) { if (generation === importGeneration) report(error.message, true); return; }
         finally { if (generation === importGeneration) pendingPaste = false; options.update(); }
       }
@@ -171,7 +197,7 @@
     }
     toggle.addEventListener("change", () => { cancel(); options.invalidate(); options.update(); controls(); });
     e.sourceText.addEventListener("paste", paste); preview.addEventListener("paste", paste);
-    preview.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); run(); } });
+    preview.addEventListener("keydown", (event) => { if (!event.target.closest("input, textarea") && (event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); run(); } });
     const initialContent = contentRevision;
     root.MaterialDraft.load().then(async (draft) => {
       if (!draft || draft.version !== 1 || contentRevision !== initialContent || e.sourceText.value) return;
@@ -179,8 +205,9 @@
       if (draft.processed) root.ClipboardDocument.validate(draft.processed);
       for (const block of draft.source) if (block.type === "image") await root.DocumentImages.decode(block.dataUrl);
       if (contentRevision !== initialContent || e.sourceText.value) return;
-      source = draft.source; notes = Array.isArray(draft.notes) ? draft.notes : [];
-      processed = draft.processed || null; changed = Number(draft.changed) || 0;
+      source = root.DocumentLayout.prepare(draft.source); notes = Array.isArray(draft.notes) ? draft.notes : [];
+      processed = draft.processed ? draft.processed.map((b, i) => source[i].type !== draft.source[i].type ? structuredClone(source[i]) : b) : null;
+      changed = Number(draft.changed) || 0;
       if (active()) display(); summary();
     }).catch(() => report("Сохранённый черновик недоступен. Можно вставить материал заново.", true));
     return {

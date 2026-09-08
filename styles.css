@@ -877,6 +877,12 @@ summary:focus-visible,
 .material-table { overflow-x: auto; margin: 18px 0; max-width: 100%; white-space: normal; }
 .material-table table { border-collapse: collapse; width: 100%; font-size: 15px; }
 .material-table td, .material-table th { border: 1px solid #b8bfca; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 72px; }
+.material-object { margin: 24px 0; min-width: 0; }
+.material-caption { margin: 8px 0; font-size: 15px; line-height: 1.4; }
+.material-layout-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: Arial, sans-serif; }
+.material-layout-tools button { padding: 6px 10px; font-size: 13px; }
+.material-layout-tools label { flex: 1 1 190px; min-width: 0; color: var(--text-muted, #636875); }
+.material-layout-tools input { display: block; width: 100%; min-width: 0; box-sizing: border-box; padding: 8px; font: inherit; border: 1px solid var(--line-strong); border-radius: 7px; background: white; color: var(--ink); }
 
 @media (prefers-reduced-motion: reduce) {
   html {

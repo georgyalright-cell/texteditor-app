@@ -672,7 +672,7 @@
       const missing = [...assembled.blanks, ...assembled.inserted];
       setResultState(missing.length ? "Документ собран · проверьте комплектность" : "Документ собран", missing.length ? "neutral" : "success");
       renderCompliance({ problems: missing.length ? [{ title: "Проверьте недостающие данные и разделы", items: missing }] : [], notes: [] });
-      setStatus(elements.resultNote, `Базово изменено абзацев: ${changed}. Порядок материала сохранён; титульные страницы и оглавление добавлены. TXT не содержит фотографий — для полной работы скачайте DOCX.`, false);
+      setStatus(elements.resultNote, `Базово изменено абзацев: ${changed}. Размещение соответствует предпросмотру; титульные страницы и оглавление добавлены. TXT не содержит фотографий — для полной работы скачайте DOCX.`, false);
     },
   });
   fillProfiles();

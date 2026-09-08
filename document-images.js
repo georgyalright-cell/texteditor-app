@@ -47,10 +47,12 @@
   function drawing(block, index, page, escape) {
     const info = read(block.dataUrl);
     const maxWidth = (page.widthMm - page.marginLeftMm - page.marginRightMm) * 36000;
-    const maxHeight = (page.heightMm - page.marginTopMm - page.marginBottomMm - 15) * 36000;
+    const usableHeight = page.heightMm - page.marginTopMm - page.marginBottomMm;
+    const captionReserve = Math.min(usableHeight / 2, Math.ceil((block.captionLength || 0) / 65) * 6);
+    const maxHeight = (usableHeight - 15 - captionReserve) * 36000;
     const scale = Math.min(9525, maxWidth / info.width, maxHeight / info.height);
     const cx = Math.round(info.width * scale), cy = Math.round(info.height * scale);
-    return '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing>' +
+    return `<w:p><w:pPr>${block.keepWithCaption ? '<w:keepNext/>' : ''}<w:keepLines/><w:spacing w:before="120" w:after="120" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="center"/></w:pPr><w:r><w:drawing>` +
       '<wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" distT="0" distB="0" distL="0" distR="0">' +
       `<wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${index}" name="Image ${index}" descr="${escape(block.alt || "")}"/>` +
       '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +

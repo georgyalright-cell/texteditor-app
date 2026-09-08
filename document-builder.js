@@ -526,6 +526,9 @@
     const counters = { table: 0, figure: 0 };
     for (const block of blocks) {
       if (block.type !== "caption") continue;
+      // Whole-document layout preserves authored labels: references in prose
+      // must not silently change their meaning when an object is moved.
+      if (block.retainNumber) continue;
       counters[block.kind] += 1;
       block.number = String(counters[block.kind]);
       block.prefix = profile.captions[block.kind].prefix;
