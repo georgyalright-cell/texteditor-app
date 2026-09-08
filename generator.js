@@ -27,7 +27,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new root.Worker("generator-worker.js?v=42", { type: "module" });
+    worker = new root.Worker("generator-worker.js?v=43", { type: "module" });
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "progress") {

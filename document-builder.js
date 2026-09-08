@@ -106,7 +106,7 @@
   }
 
   function segmentHasContent(segment) {
-    return segment && segment.blocks.some((block) => Structurer.isBodyBlock(block) && block.text !== PLACEHOLDER_MARK);
+    return segment && segment.blocks.some((block) => (Structurer.isBodyBlock(block) || ["image", "docTable"].includes(block.type)) && block.text !== PLACEHOLDER_MARK);
   }
 
   function coversSubsection(segment, subsection) {
@@ -321,6 +321,7 @@
     );
 
     const normalized = Structurer.applyProfile(settings.text || "", profile.id, { placeholders: false });
+    if (settings.blocks) normalized.blocks = structuredClone(settings.blocks);
     const segments = segmentByHeadings(normalized.blocks, profile.requiredSections);
 
     const sections = profile.requiredSections;
@@ -469,6 +470,12 @@
       inserted.push("Материал без раздела (текст до первого заголовка)");
     }
 
+    // A complete pasted document owns its order. Add the shared front matter,
+    // but never silently reorder or replace supplied material with templates.
+    if (settings.blocks && settings.preserveOrder) {
+      const bodyStart = blocks.findIndex((block) => block.type === "toc") + 1;
+      blocks.splice(bodyStart, blocks.length - bodyStart, ...structuredClone(settings.blocks));
+    }
     renumberSections(blocks);
     renumberTables(blocks, profile);
 

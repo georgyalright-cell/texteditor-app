@@ -1,10 +1,11 @@
 (function attachDocxWriter(root, factory) {
   const api = factory(
     typeof module === "object" && module.exports ? require("./format-profiles.js") : root.FormatProfiles,
+    typeof module === "object" && module.exports ? require("./document-images.js") : root.DocumentImages,
   );
   if (typeof module === "object" && module.exports) module.exports = api;
   root.DocxWriter = api;
-})(typeof globalThis !== "undefined" ? globalThis : window, function createDocxWriter(FormatProfiles) {
+})(typeof globalThis !== "undefined" ? globalThis : window, function createDocxWriter(FormatProfiles, Images) {
   "use strict";
 
   // Минимальный WordprocessingML-пакет. Никаких библиотек генерации docx:
@@ -47,7 +48,8 @@
     if (settings.bold) properties.push("<w:b/>");
     if (settings.italic) properties.push("<w:i/>");
     const runProperties = properties.length ? `<w:rPr>${properties.join("")}</w:rPr>` : "";
-    return `<w:r>${runProperties}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+    const content = String(text).split(/\r\n?|\n/u).map((line) => `<w:t xml:space="preserve">${escapeXml(line)}</w:t>`).join("<w:br/>");
+    return `<w:r>${runProperties}${content}</w:r>`;
   }
 
   function paragraphXml(text, options) {
@@ -225,6 +227,8 @@
   }
 
   function blockParagraphs(block, profile, state) {
+    if (block.type === "imageMissing") throw new Error("Прикрепите недоступное фото перед экспортом.");
+    if (block.type === "image") return [Images.drawing(block, ++state.imageIndex, profile.layout.page, escapeXml)];
     const layout = profile.layout;
     const bodyIndent = FormatProfiles.cmToTwips(layout.body.firstLineIndentCm);
     const lineTwips = lineSpacingToTwips(layout.body.lineSpacing);
@@ -324,7 +328,7 @@
   }
 
   function buildDocumentXml(blocks, profile) {
-    const state = { emitted: 0 };
+    const state = { emitted: 0, imageIndex: 0 };
     const body = [];
     for (const block of blocks) {
       const paragraphs = blockParagraphs(block, profile, state);
@@ -434,6 +438,7 @@
   }
 
   function buildPackage(blocks, profile) {
+    Images.validate(blocks);
     const hasFooter = profile.layout.pageNumbers.enabled;
     const parts = {
       "[Content_Types].xml": buildContentTypesXml(hasFooter),
@@ -444,6 +449,19 @@
       "word/settings.xml": buildSettingsXml(),
     };
     if (hasFooter) parts["word/footer1.xml"] = buildFooterXml(profile);
+    let index = 0;
+    const formats = new Set();
+    for (const block of blocks.filter((item) => item.type === "image")) {
+      const info = Images.read(block.dataUrl); index++;
+      const name = `image${index}.${info.extension}`;
+      parts[`word/media/${name}`] = info.bytes;
+      parts["word/_rels/document.xml.rels"] = parts["word/_rels/document.xml.rels"].replace("</Relationships>",
+        `<Relationship Id="rIdImage${index}" Type="${NS_R}/image" Target="media/${name}"/></Relationships>`);
+      if (!formats.has(info.extension)) {
+        parts["[Content_Types].xml"] = parts["[Content_Types].xml"].replace("</Types>", `<Default Extension="${info.extension}" ContentType="${info.mime}"/></Types>`);
+        formats.add(info.extension);
+      }
+    }
     return parts;
   }
 

@@ -27,7 +27,8 @@
       isCancelled: () => !current(), releaseGenerator: () => root.Generator.cancel(),
     });
     const budget = { share: 0.35, limit: 5, shortlist: 2 };
-    root.RevisionPreview.clear();
+    if (options.collect) budget.share = 1;
+    if (!options.collect) root.RevisionPreview.clear();
     options.report("Готовлю варианты с учётом контекста и стиля. Результат появится для просмотра перед применением.");
     // Bounds a stalled GPU request without changing the source or export state.
     const timer = setTimeout(cancel, 15 * 60 * 1000);
@@ -45,6 +46,7 @@
       if (!result.ok) { options.report(result.warnings.join(" "), true); return; }
       const warnings = (result.generatorWarnings || []).join(". ");
       for (const detail of result.details) detail.neural = ranker.pair(detail.before, detail.after);
+      if (options.collect) { result.rankingSummary = ranker.summary(); options.collect(result); return; }
       if (!result.replaced) {
         options.report(`Подходящих вариантов не найдено. Текущий текст сохранён. ${ranker.summary()}${warnings ? ` ${warnings}` : " Менять удачную формулировку необязательно."}`, Boolean(warnings));
         return;

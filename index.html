@@ -12,12 +12,12 @@
     <meta name="referrer" content="no-referrer" />
     <title>TextEditor — обработка и сборка работ</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23108764'/%3E%3Cpath d='M8 9h16M16 9v15' stroke='white' stroke-width='3'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="styles.css?v=42" />
-    <link rel="stylesheet" href="workspace.css?v=42" />
-    <link rel="stylesheet" href="review.css?v=42" />
-    <link rel="stylesheet" href="neural-scorer.css?v=42" />
-    <link rel="stylesheet" href="help.css?v=42" />
-    <link rel="stylesheet" href="revision-preview.css?v=42" />
+    <link rel="stylesheet" href="styles.css?v=43" />
+    <link rel="stylesheet" href="workspace.css?v=43" />
+    <link rel="stylesheet" href="review.css?v=43" />
+    <link rel="stylesheet" href="neural-scorer.css?v=43" />
+    <link rel="stylesheet" href="help.css?v=43" />
+    <link rel="stylesheet" href="revision-preview.css?v=43" />
   </head>
   <body>
     <header class="site-header">
@@ -141,6 +141,12 @@
               <h1 id="source-title">Текст для обработки</h1>
             </div>
 
+            <label id="wholeDocumentChoice" class="material-choice" hidden>
+              <input type="checkbox" id="wholeDocument" checked /> Работа целиком из буфера
+              <small>Текст, прямоугольные таблицы, PNG/JPEG. Снимите флажок, чтобы добавлять отдельные части как раньше.</small>
+              <small>Модель обрабатывает абзацы порциями: большой документ может занять десятки минут. Первая загрузка — около 1,5 ГБ, затем используются сохранённые веса. Можно остановить и скачать базовый DOCX.</small>
+            </label>
+            <p id="materialStatus" class="status" role="status" aria-live="polite" hidden></p>
             <div class="part-fields" id="partFields" hidden>
               <label class="compact-field">
                 <span>Раздел работы</span>
@@ -159,6 +165,7 @@
                 placeholder="Вставьте сырой текст или перетащите файл"
                 aria-describedby="fileSupport sourceStatus"
               ></textarea>
+              <div id="materialSource" class="material-source" tabindex="0" aria-label="Вставленный документ. Новая вставка заменит материал" hidden></div>
               <span class="counter source-counter" id="sourceCount">0 символов</span>
             </div>
 
@@ -379,9 +386,12 @@
           <h3 id="helpProjectTitle">Собрать полноценную работу</h3>
           <ol>
             <li>Заполните паспорт работы.</li>
-            <li>Выберите раздел, вставьте материал и обработайте его.</li>
-            <li>Дождитесь предложений модели или остановите её; примените подходящие варианты. Затем нажмите «Добавить часть в работу» и повторите для остальных разделов. При сборке сохранённые части повторно моделью не переписываются.</li>
-            <li>Закройте пункты готовности, соберите документ и скачайте DOCX.</li>
+            <li>Для целой работы оставьте флажок «Работа целиком из буфера». Скопируйте материал из Claude или Word и вставьте в поле. Сохраняются порядок, заголовки, прямоугольные таблицы и PNG/JPEG. Markdown-таблицы тоже распознаются.</li>
+            <li>Проверьте предпросмотр. Ссылки на недоступные фото отмечаются отдельно: прикрепите их файлами на указанные места. Объединённые ячейки, таблицы/фото внутри списков и ячеек нужно вынести отдельными блоками. Предпросмотр не редактируется; новая вставка заменяет весь материал с подтверждением.</li>
+            <li>Нажмите «Обработать и собрать документ». Базовые правила проходят все обычные абзацы; таблицы, списки и фотографии сохраняются без перефразирования. Модель проходит текст порциями до пяти предложений, а не только начало работы. Варианты нужно подтвердить. Большая работа может занять десятки минут; остановленный проход продолжается в этой вкладке.</li>
+            <li>Исходник и подтверждённый результат сохраняются локально в этом браузере. После перезагрузки можно снова собрать их; незавершённые предложения модели и позиция прохода не сохраняются. Очистка данных браузера удаляет черновик. Для полной работы скачайте DOCX, не TXT.</li>
+            <li>Проверьте недостающие поля и разделы. Они не сочиняются автоматически. В Word обновите оглавление через «Обновить поле». Если вставили собственный титульный лист или оглавление, проверьте дубли: служебные страницы выбранного шаблона добавляются отдельно.</li>
+            <li>Чтобы собирать работу по частям как раньше, снимите флажок: выберите раздел → обработайте текст → подтвердите варианты → «Добавить часть в работу». Затем закройте пункты готовности и соберите документ. Сохранённая библиотека частей не смешивается автоматически с целой вставкой.</li>
           </ol>
         </section>
       </div>
@@ -396,46 +406,53 @@
       </p>
     </dialog>
 
-    <script src="vendor/mammoth/mammoth.browser.min.js?v=42" defer></script>
-    <script src="vendor/jszip/jszip.min.js?v=42" defer></script>
-    <script src="vendor/sheetjs/xlsx.full.min.js?v=42" defer></script>
-    <script src="format-profiles.js?v=42" defer></script>
-    <script src="typography.js?v=42" defer></script>
-    <script src="humanizer-metrics.js?v=42" defer></script>
-    <script src="anchor-guard.js?v=42" defer></script>
-    <script src="text-metrics.js?v=42" defer></script>
-    <script src="edit-passes.js?v=42" defer></script>
-    <script src="elicitation.js?v=42" defer></script>
-    <script src="revision-store.js?v=42" defer></script>
-    <script src="processor.js?v=42" defer></script>
-    <script src="paraphraser.js?v=42" defer></script>
-    <script src="rewriter.js?v=42" defer></script>
-    <script src="deep-revision.js?v=42" defer></script>
-    <script src="candidate-select.js?v=42" defer></script>
-    <script src="weak-spots.js?v=42" defer></script>
-    <script src="usage-baseline.js?v=42" defer></script>
-    <script src="humanizer-engine.js?v=42" defer></script>
-    <script src="text-pipeline.js?v=42" defer></script>
-    <script src="structurer.js?v=42" defer></script>
-    <script src="document-builder.js?v=42" defer></script>
-    <script src="docx-writer.js?v=42" defer></script>
-    <script src="document-reader.js?v=42" defer></script>
-    <script src="work-project.js?v=42" defer></script>
-    <script src="project-view.js?v=42" defer></script>
-    <script src="neural-scorer.js?v=42" defer></script>
-    <script src="generator-core.js?v=42" defer></script>
-    <script src="generator.js?v=42" defer></script>
-    <script src="business-english.js?v=42" defer></script>
-    <script src="meaning-guard.js?v=42" defer></script>
-    <script src="revision-quality.js?v=42" defer></script>
-    <script src="revision-candidates.js?v=42" defer></script>
-    <script src="semantic-scorer.js?v=42" defer></script>
-    <script src="revision-preview.js?v=42" defer></script>
-    <script src="neural-ranking.js?v=42" defer></script>
-    <script src="polish-ui.js?v=42" defer></script>
-    <script src="review-ui.js?v=42" defer></script>
-    <script src="help-dialog.js?v=42" defer></script>
-    <script src="processing-run.js?v=42" defer></script>
-    <script src="app.js?v=42" defer></script>
+    <script src="vendor/mammoth/mammoth.browser.min.js?v=43" defer></script>
+    <script src="vendor/jszip/jszip.min.js?v=43" defer></script>
+    <script src="vendor/sheetjs/xlsx.full.min.js?v=43" defer></script>
+    <script src="format-profiles.js?v=43" defer></script>
+    <script src="typography.js?v=43" defer></script>
+    <script src="humanizer-metrics.js?v=43" defer></script>
+    <script src="anchor-guard.js?v=43" defer></script>
+    <script src="text-metrics.js?v=43" defer></script>
+    <script src="edit-passes.js?v=43" defer></script>
+    <script src="elicitation.js?v=43" defer></script>
+    <script src="revision-store.js?v=43" defer></script>
+    <script src="processor.js?v=43" defer></script>
+    <script src="paraphraser.js?v=43" defer></script>
+    <script src="rewriter.js?v=43" defer></script>
+    <script src="deep-revision.js?v=43" defer></script>
+    <script src="candidate-select.js?v=43" defer></script>
+    <script src="weak-spots.js?v=43" defer></script>
+    <script src="usage-baseline.js?v=43" defer></script>
+    <script src="humanizer-engine.js?v=43" defer></script>
+    <script src="text-pipeline.js?v=43" defer></script>
+    <script src="structurer.js?v=43" defer></script>
+    <script src="document-builder.js?v=43" defer></script>
+    <script src="document-images.js?v=43" defer></script>
+    <script src="docx-writer.js?v=43" defer></script>
+    <script src="clipboard-document.js?v=43" defer></script>
+    <script src="document-reader.js?v=43" defer></script>
+    <script src="work-project.js?v=43" defer></script>
+    <script src="project-view.js?v=43" defer></script>
+    <script src="neural-scorer.js?v=43" defer></script>
+    <script src="generator-core.js?v=43" defer></script>
+    <script src="generator.js?v=43" defer></script>
+    <script src="business-english.js?v=43" defer></script>
+    <script src="meaning-guard.js?v=43" defer></script>
+    <script src="revision-quality.js?v=43" defer></script>
+    <script src="revision-candidates.js?v=43" defer></script>
+    <script src="semantic-scorer.js?v=43" defer></script>
+    <script src="revision-preview.js?v=43" defer></script>
+    <script src="neural-ranking.js?v=43" defer></script>
+    <script src="polish-ui.js?v=43" defer></script>
+    <script src="review-ui.js?v=43" defer></script>
+    <script src="help-dialog.js?v=43" defer></script>
+    <script src="processing-run.js?v=43" defer></script>
+    <script src="material-processing.js?v=43" defer></script>
+    <script src="material-view.js?v=43" defer></script>
+    <script src="material-draft.js?v=43" defer></script>
+    <script src="material-workspace.js?v=43" defer></script>
+    <script src="app-export.js?v=43" defer></script>
+    <script src="app.js?v=43" defer></script>
   </body>
 </html>

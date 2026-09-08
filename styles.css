@@ -491,6 +491,7 @@ summary:focus-visible,
 }
 
 .field {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -505,6 +506,8 @@ summary:focus-visible,
 .field input,
 .field select,
 .field textarea {
+  min-width: 0;
+  width: 100%;
   padding: 9px 11px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
@@ -858,6 +861,22 @@ summary:focus-visible,
     grid-template-columns: 1fr;
   }
 }
+
+.material-choice { display: block; margin: 0 0 12px; font-size: 15px; }
+.material-choice[hidden], .material-source[hidden], #sourceText[hidden], .file-row[hidden], #sourceCount[hidden] { display: none; }
+.material-choice small { display: block; margin-top: 6px; color: var(--text-muted, #636875); line-height: 1.5; }
+.material-source { height: 100%; min-height: 0; overflow: auto; padding: 24px; }
+.material-source:focus { outline: 2px solid #608adb; outline-offset: -3px; }
+.material-source p, #resultText p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.material-source h3, #resultText h3 { font-size: 1.1em; margin: 1.3em 0 .6em; }
+.material-source figure, #resultText figure { margin: 18px 0; }
+.material-source img, #resultText img { display: block; max-width: 100%; max-height: 480px; object-fit: contain; }
+.material-source figcaption, #resultText figcaption { font-size: 14px; line-height: 1.5; }
+.material-source input[type="file"] { max-width: 100%; font-size: 13px; }
+.material-source label { display: block; font-size: 14px; }
+.material-table { overflow-x: auto; margin: 18px 0; max-width: 100%; white-space: normal; }
+.material-table table { border-collapse: collapse; width: 100%; font-size: 15px; }
+.material-table td, .material-table th { border: 1px solid #b8bfca; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 72px; }
 
 @media (prefers-reduced-motion: reduce) {
   html {

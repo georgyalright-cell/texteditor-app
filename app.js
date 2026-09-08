@@ -65,6 +65,7 @@
   let sourceFilename = "";
   let project = loadProject();
   let activeReview = null;
+  let material = null;
   const processing = window.ProcessingRun.create({
     base: processSource,
     supported: () => Boolean(window.Generator && window.Generator.supported()),
@@ -176,6 +177,7 @@
     elements.downloadDocxButton.disabled = !hasResult || !currentBlocks.length;
     elements.addPartButton.disabled = processing.busy() || currentMode !== "project" || !currentProcessedPart;
     elements.assembleProjectButton.disabled = processing.busy() || currentMode !== "project" || !hasParts;
+    if (material) material.controls();
   }
 
   function renderMetrics(result, before) {
@@ -536,11 +538,15 @@
     elements.sourceText.placeholder = projectMode ? "Вставьте очередную часть, источник или таблицу" : "Вставьте сырой текст или перетащите файл";
     resetResult();
     if (projectMode) renderProject();
+    if (material) material.setMode(projectMode);
     elements.sourceText.focus();
   }
 
   async function loadFile(file) {
     if (!file) return;
+    if (material && material.active()) {
+      setStatus(elements.sourceStatus, "В режиме целой работы используйте вставку из буфера. Для прежнего импорта файла снимите флажок «Работа целиком».", true); return;
+    }
     setStatus(elements.sourceStatus, `Читаю ${file.name}…`, false);
     try {
       const extracted = await window.DocumentReader.readFile(file);
@@ -558,6 +564,7 @@
   }
 
   function clearCurrent() {
+    if (material && material.active()) material.clear();
     elements.sourceText.value = "";
     elements.partTitle.value = "";
     sourceFilename = "";
@@ -575,44 +582,16 @@
     renderProject();
   }
 
-  function safeBasename() {
-    const topic = project && project.metadata.topic;
-    const source = currentOutputKind === "document" ? topic || "course_project" : sourceFilename || "processed_text";
-    return source.replace(/[^\p{L}\p{N}_-]+/gu, "_").replace(/^_+|_+$/g, "").slice(0, 70) || "processed_text";
-  }
-
-  function saveBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  function downloadResult() {
-    if (!currentResult) return;
-    const suffix = currentOutputKind === "document" ? "assembled" : "processed";
-    saveBlob(new Blob(["\uFEFF", currentResult], { type: "text/plain;charset=utf-8" }), `${safeBasename()}_${suffix}.txt`);
-  }
-
-  async function downloadDocx() {
-    if (!currentResult || !currentBlocks.length) return;
-    elements.downloadDocxButton.disabled = true;
-    try {
-      const blob = await window.DocxWriter.createDocxBlob(currentBlocks, window.FormatProfiles.get(currentOutputProfileId || selectedProfileId()));
-      const suffix = currentOutputKind === "document" ? "document" : "formatted";
-      saveBlob(blob, `${safeBasename()}_${suffix}.docx`);
-    } catch (error) {
-      setStatus(elements.resultNote, error instanceof Error ? error.message : "Не удалось собрать DOCX.", true);
-    } finally {
-      updateControls();
-    }
-  }
+  const exporter = window.AppExport.create({
+    state: () => ({ text: currentResult, blocks: currentBlocks, kind: currentOutputKind,
+      topic: project.metadata.topic, filename: sourceFilename, profileId: currentOutputProfileId || selectedProfileId() }),
+    busy: () => { elements.downloadDocxButton.disabled = true; }, update: updateControls,
+    error: (message) => setStatus(elements.resultNote, message, true),
+  });
+  function runProcessing() { return material && material.active() ? material.run() : processing.run(); }
 
   elements.sourceText.addEventListener("input", () => {
+    if (material && material.active()) material.invalidate();
     setStatus(elements.sourceStatus, "", false);
     if (currentResult) resetResult();
     updateControls();
@@ -620,19 +599,20 @@
   elements.sourceText.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
       event.preventDefault();
-      processing.run();
+      runProcessing();
     }
   });
   elements.fileInput.addEventListener("change", () => loadFile(elements.fileInput.files[0]));
-  elements.processButton.addEventListener("click", () => processing.run());
-  document.getElementById("polishCancelButton").addEventListener("click", () => processing.cancel());
+  elements.processButton.addEventListener("click", runProcessing);
+  document.getElementById("polishCancelButton").addEventListener("click", () => { processing.cancel(); if (material) material.cancel(); });
   elements.addPartButton.addEventListener("click", addCurrentPart);
   elements.assembleProjectButton.addEventListener("click", assembleProject);
   elements.resetProjectButton.addEventListener("click", resetProject);
   elements.clearButton.addEventListener("click", clearCurrent);
-  elements.downloadButton.addEventListener("click", downloadResult);
-  elements.downloadDocxButton.addEventListener("click", downloadDocx);
+  elements.downloadButton.addEventListener("click", exporter.text);
+  elements.downloadDocxButton.addEventListener("click", exporter.docx);
   elements.profileSelect.addEventListener("change", () => {
+    if (material) material.invalidate(true);
     updateProfileDescription();
     fillSectionOptions();
     if (currentMode === "project") {
@@ -644,6 +624,7 @@
   });
   for (const field of Object.values(metaFields)) {
     field.addEventListener("input", () => {
+      if (material) material.invalidate(true);
       syncProjectMetadata();
       if (currentOutputKind === "document") resetResult();
       renderProject();
@@ -681,6 +662,19 @@
     });
   }
 
+  material = window.MaterialWorkspace.mount({
+    elements, otherBusy: () => processing.busy(), profile: selectedProfileId,
+    metadata: () => window.WorkProject.toBuilderMetadata(project), update: updateControls, invalidate: resetResult,
+    result(assembled, changed) {
+      currentBlocks = assembled.blocks; currentOutputKind = "document"; currentOutputProfileId = assembled.profile.id; currentProcessedPart = "";
+      showResult(window.ClipboardDocument.textOf(assembled.blocks));
+      window.MaterialView.render(elements.resultText, assembled.blocks);
+      const missing = [...assembled.blanks, ...assembled.inserted];
+      setResultState(missing.length ? "Документ собран · проверьте комплектность" : "Документ собран", missing.length ? "neutral" : "success");
+      renderCompliance({ problems: missing.length ? [{ title: "Проверьте недостающие данные и разделы", items: missing }] : [], notes: [] });
+      setStatus(elements.resultNote, `Базово изменено абзацев: ${changed}. Порядок материала сохранён; титульные страницы и оглавление добавлены. TXT не содержит фотографий — для полной работы скачайте DOCX.`, false);
+    },
+  });
   fillProfiles();
   hydrateMetadata();
   renderProject();
