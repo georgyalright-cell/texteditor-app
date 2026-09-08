@@ -143,5 +143,5 @@ test("глубокая редакция добавляет только конт
   assert.match(workerSource, /SAMPLING_TOP_P = 0\.92/u);
   assert.match(workerSource, /seed: samplingSeed\(request\.id\)/u);
   assert.doesNotMatch(workerSource, /seed:\s*20260903/u);
-  assert.match(generatorSource, /generator-worker\.js\?v=44/u);
+  assert.match(generatorSource, /generator-worker\.js\?v=45/u);
 });

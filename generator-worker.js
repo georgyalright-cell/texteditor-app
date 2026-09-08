@@ -1,10 +1,10 @@
 "use strict";
 
-import "./author-style.js?v=44";
-import "./business-english.js?v=44";
-import "./generator-core.js?v=44";
-import "./meaning-guard.js?v=44";
-import "./model-progress.js?v=44";
+import "./author-style.js?v=45";
+import "./business-english.js?v=45";
+import "./generator-core.js?v=45";
+import "./meaning-guard.js?v=45";
+import "./model-progress.js?v=45";
 import { CreateMLCEngine } from "./vendor/webllm/web-llm.mjs";
 
 const GENERATOR_MODEL = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";

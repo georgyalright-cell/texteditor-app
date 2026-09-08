@@ -53,7 +53,7 @@
       e.processButton.disabled = !available || busy || pendingPaste || options.otherBusy();
       e.clearButton.disabled = !available && !busy;
       e.sourceTitle.textContent = "Работа целиком из буфера";
-      e.sourceText.placeholder = "Скопируйте весь материал в Claude / Word и вставьте сюда: текст, таблицы и фотографии";
+      e.sourceText.placeholder = "Вставьте работу целиком";
       document.getElementById("polishCancelButton").hidden = !busy && !options.otherBusy();
       const missing = source.some((block) => block.type === "imageMissing");
       if (missing || busy || pendingPaste) { e.downloadDocxButton.disabled = true; e.downloadButton.disabled = true; }
