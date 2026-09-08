@@ -474,7 +474,10 @@
     // but never silently reorder or replace supplied material with templates.
     if (settings.blocks && settings.preserveOrder) {
       const bodyStart = blocks.findIndex((block) => block.type === "toc") + 1;
-      blocks.splice(bodyStart, blocks.length - bodyStart, ...structuredClone(settings.blocks));
+      const supplied = structuredClone(settings.blocks), first = supplied[0];
+      const startsNewPage = first && first.type === "heading" && first.level === 1 && profile.layout.heading.pageBreakBeforeTopLevel;
+      const boundary = supplied.length && !startsNewPage ? [{ type: "pageBreak", generated: true }] : [];
+      blocks.splice(bodyStart, blocks.length - bodyStart, ...boundary, ...supplied);
     }
     renumberSections(blocks);
     renumberTables(blocks, profile);

@@ -55,6 +55,13 @@ test("Markdown input keeps headings, tables and unavailable photo positions", ()
   assert.deepEqual(blocks.map((block) => block.type), ["heading", "paragraph", "docTable", "imageMissing", "paragraph"]);
   assert.equal(blocks[2].rows[0][1], "125");
 });
+test("body beginning with prose or a photo starts after the contents page", () => {
+  for (const first of [{ type: "paragraph", text: "Opening paragraph." }, photo]) {
+    const result = Builder.assemble({ blocks: [first], preserveOrder: true, text: Clipboard.textOf([first]), profileId: profile.id });
+    const toc = result.blocks.findIndex((block) => block.type === "toc");
+    assert.equal(result.blocks[toc + 1].type, "pageBreak"); assert.deepEqual(result.blocks[toc + 2], first);
+  }
+});
 test("plain and rich document limits reject oversized or irregular input", () => {
   assert.throws(() => Clipboard.plain("x".repeat(200001)), /200 000/u);
   assert.throws(() => Clipboard.validate(Array(3001).fill({ type: "paragraph", text: "x" })), /3000/u);
