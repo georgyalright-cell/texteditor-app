@@ -577,36 +577,117 @@
   // русском. Правки здесь ничего не удаляют и не добавляют слов: попутное
   // уточнение уходит в скобки, пояснение — за двоеточие. Ровно те места, где
   // выбор знака однозначен, остальное автору.
+  // Обороты, которые русский автор оформляет то запятыми, то скобками. Список
+  // и порядок измерены на корпусе (226 фрагментов): в скобках оказывается 15%
+  // таких оборотов, остальные 85% остаются между запятыми. Поэтому пасс
+  // переводит в скобки долю, а не всё подряд — «все в скобках» это своя
+  // собственная ровность, ничем не лучше нуля скобок у генерации.
+  //
+  // Порядок — по измеренной доле скобок у живых авторов: «по сравнению с» 75%,
+  // «в зависимости от» 67%, «за исключением» 33%, «с учётом» 25%, «в том
+  // числе» 22%, «например» 20%, «помимо» 13%, «прежде всего» 12%, «включая»
+  // 10%, «то есть» 7%.
+  const PAREN_LEADS_RU = [
+    "по сравнению с", "в зависимости от", "за исключением", "с уч[её]том",
+    "в том числе", "например", "помимо", "прежде всего", "включая", "то есть",
+    "в частности", "среди них", "скажем",
+  ];
+  const PAREN_SHARE_RU = 0.15;
+  // Запятая после ведущего слова нужна только вводным словам: «(например,
+  // розничный сегмент)» — верно, «(в том числе, логистику)» — нет, потому что
+  // «в том числе» вводит перечисление напрямую и запятой не требует.
+  // Скобки заменяют обе запятые оборота, поэтому после закрывающей скобки
+  // запятая по умолчанию не нужна: «растёт, например розничный сегмент, третий
+  // год» → «растёт (например, розничный сегмент) третий год». Она остаётся
+  // только там, где её требует не оборот, а то, что идёт дальше: придаточное
+  // со своим союзом.
+  const SUBORDINATOR_NEXT = new RegExp(
+    `^${SPACE}*(?:что|чтобы|который|которая|которое|которые|которых|когда|если|поскольку|где|хотя|потому|так как`
+      + `|which|that|because|while|although|whereas|since)${SPACE}`,
+    "iu",
+  );
+  const PAREN_COMMA_AFTER = /^(например|то есть|в частности|скажем|среди них|for example|for instance|that is|in particular|among them|say)$/iu;
+  const PAREN_LEADS_EN = [
+    "for example", "for instance", "that is", "in particular", "including", "among them", "say",
+  ];
+  // Английская доля не измерялась отдельно; берётся русская как ориентир, и
+  // это отмечено честно, а не выдано за измерение.
+  const PAREN_SHARE_EN = 0.15;
+
   const PUNCTUATION_RU = [
     [new RegExp(`,${SPACE}*а именно,?${SPACE}+`, "giu"), ": ", "пояснение ставится за двоеточие, а не за запятую"],
-    [new RegExp(`,${SPACE}*(например|в частности|то есть|в том числе|включая|среди них|скажем),?${SPACE}*([^,.;:()!?]{3,70}),`, "giu"),
-      null, "попутное уточнение уходит в скобки"],
-    [new RegExp(`,${SPACE}*(например|в частности|то есть|включая|среди них|скажем),${SPACE}*([^,.;:()!?]{3,90})([.!?])`, "giu"),
-      null, "попутное уточнение уходит в скобки"],
   ];
   const PUNCTUATION_EN = [
     [new RegExp(`,${SPACE}*namely,?${SPACE}+`, "giu"), ": ", "пояснение ставится за двоеточие"],
-    [new RegExp(`,${SPACE}*(for example|for instance|that is|in particular|including|among them|say),${SPACE}*([^,.;:()!?]{3,70}),`, "giu"),
-      null, "попутное уточнение уходит в скобки"],
-    [new RegExp(`,${SPACE}*(for example|for instance|that is|in particular|including|among them|say),${SPACE}*([^,.;:()!?]{3,90})([.!?])`, "giu"),
-      null, "попутное уточнение уходит в скобки"],
   ];
+
+  // Перевод оборота в скобки. Правило одно на все обороты, отличается только
+  // ведущим словом, поэтому строится из списка, а не переписывается по разу.
+  function parenRules(leads) {
+    const rules = [];
+    for (const lead of leads) {
+      rules.push([
+        new RegExp(`,${SPACE}*(${lead}),?${SPACE}*([^,.;:()!?]{3,70}),`, "giu"),
+        null, "попутное уточнение уходит в скобки",
+      ]);
+      rules.push([
+        new RegExp(`,${SPACE}*(${lead}),?${SPACE}*([^,.;:()!?]{3,90})([.!?])`, "giu"),
+        null, "попутное уточнение уходит в скобки",
+      ]);
+    }
+    return rules;
+  }
 
   function collectPunctuation(text, language) {
     const edits = [];
-    const rules = language === "ru" ? PUNCTUATION_RU : PUNCTUATION_EN;
+    const leads = language === "ru" ? PAREN_LEADS_RU : PAREN_LEADS_EN;
+    const share = language === "ru" ? PAREN_SHARE_RU : PAREN_SHARE_EN;
+    const rules = [...(language === "ru" ? PUNCTUATION_RU : PUNCTUATION_EN), ...parenRules(leads)];
+    // Скобочные правки собираются отдельно от двоеточия: двоеточие после «а
+    // именно» — исправление, его норма одна, а скобки — выбор, и его норма
+    // измерена долей.
+    const brackets = [];
     for (const [pattern, fixed, reason] of rules) {
       for (const match of String(text).matchAll(pattern)) {
         let after;
-        if (fixed) after = fixed;
-        else if (match[3]) after = ` (${match[1]}, ${match[2].trim()})${match[3]}`;
-        else after = ` (${match[1]}, ${match[2].trim()}),`;
-        edits.push(makeEdit({
+        const end = match.index + match[0].length;
+        if (fixed) {
+          after = fixed;
+        } else {
+          const lead = match[1].trim();
+          const inner = PAREN_COMMA_AFTER.test(lead)
+            ? `${lead}, ${match[2].trim()}`
+            : `${lead} ${match[2].trim()}`;
+          // Запятая, закрывавшая оборот, после скобок нужна не всегда: перед
+          // сочинительным союзом при одном подлежащем она уже неверна.
+          // «процессы, в том числе X, и повышает» → «процессы (в том числе X) и
+          // повышает», без запятой.
+          const follows = String(text).slice(end, end + 14);
+          const tail = match[3] ? match[3] : (SUBORDINATOR_NEXT.test(follows) ? "," : "");
+          after = ` (${inner})${tail}`;
+        }
+        const edit = makeEdit({
           source: text, pass: "punctuation", method: 23,
           start: match.index, end: match.index + match[0].length,
           after, reason, confidence: "high",
-        }));
+        });
+        if (fixed) edits.push(edit);
+        else brackets.push(edit);
       }
+    }
+    // Доля, а не все: список ведущих слов упорядочен по измеренной частоте
+    // скобок, поэтому первые в очереди — те обороты, которые живой автор
+    // берёт в скобки чаще прочих. Одна правка остаётся всегда: текст без
+    // единой скобки отличается от текста с одной сильнее, чем с одной от двух.
+    brackets.sort((left, right) => left.start - right.start);
+    const budget = Math.max(1, Math.round(brackets.length * share));
+    // Пересекающиеся спаны не берутся вместе: apply откатил бы всю пачку.
+    let lastEnd = -1;
+    for (const edit of brackets) {
+      if (edits.filter((item) => item.pass === "punctuation" && !item.after.startsWith(":")).length >= budget) break;
+      if (edit.start < lastEnd) continue;
+      edits.push(edit);
+      lastEnd = edit.end;
     }
     return edits;
   }

@@ -15,6 +15,7 @@
     clearButton: document.querySelector("#clearButton"),
     downloadButton: document.querySelector("#downloadButton"),
     downloadDocxButton: document.querySelector("#downloadDocxButton"),
+    copyBackButton: document.querySelector("#copyBackButton"),
     addPartButton: document.querySelector("#addPartButton"),
     assembleProjectButton: document.querySelector("#assembleProjectButton"),
     resetProjectButton: document.querySelector("#resetProjectButton"),
@@ -175,6 +176,7 @@
     elements.clearButton.disabled = !hasSource && !hasResult;
     elements.downloadButton.disabled = !hasResult;
     elements.downloadDocxButton.disabled = !hasResult || !currentBlocks.length;
+    elements.copyBackButton.disabled = !hasResult || !currentBlocks.length;
     elements.addPartButton.disabled = processing.busy() || currentMode !== "project" || !currentProcessedPart;
     elements.assembleProjectButton.disabled = processing.busy() || currentMode !== "project" || !hasParts;
     if (material) material.controls();
@@ -587,6 +589,7 @@
       topic: project.metadata.topic, filename: sourceFilename, profileId: currentOutputProfileId || selectedProfileId() }),
     busy: () => { elements.downloadDocxButton.disabled = true; }, update: updateControls,
     error: (message) => setStatus(elements.resultNote, message, true),
+    notify: (message) => setStatus(elements.resultNote, message, false),
   });
   function runProcessing() { return material && material.active() ? material.run() : processing.run(); }
 
@@ -611,6 +614,7 @@
   elements.clearButton.addEventListener("click", clearCurrent);
   elements.downloadButton.addEventListener("click", exporter.text);
   elements.downloadDocxButton.addEventListener("click", exporter.docx);
+  elements.copyBackButton.addEventListener("click", exporter.copyBack);
   elements.profileSelect.addEventListener("change", () => {
     if (material) material.invalidate(true);
     updateProfileDescription();

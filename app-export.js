@@ -15,6 +15,19 @@
         const state = options.state(); if (!state.text) return;
         save(new Blob(["\uFEFF", state.text], { type: "text/plain;charset=utf-8" }), `${basename(state)}_${state.kind === "document" ? "assembled" : "processed"}.txt`);
       },
+      // Обратный путь: то же содержимое в буфер, а не новым файлом. Скачивание
+      // отдаёт документ, который надо открывать; сюда текст вернулся, чтобы
+      // встать на своё место в исходном файле.
+      async copyBack() {
+        const state = options.state();
+        if (!state.blocks || !state.blocks.length) return;
+        try {
+          const result = await root.DocumentClipboard.copy(state.blocks);
+          options.notify(result.message);
+        } catch (error) {
+          options.error(error.message || "Не удалось скопировать в буфер обмена.");
+        }
+      },
       async docx() {
         const state = options.state(); if (!state.text || !state.blocks.length) return;
         options.busy();

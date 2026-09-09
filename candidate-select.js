@@ -38,6 +38,42 @@
     return null;
   }
 
+  // Приведение варианта к тем же правилам, что и всё остальное: словарь
+  // регистра и типографика. Если после приведения якоря разошлись — а словарь
+  // их не трогает, но проверить дешевле, чем доверять, — берётся исходный
+  // вариант модели, не приведённый.
+  function normalizeCandidate(value, original, language, guard) {
+    const paraphraser = loadParaphraser();
+    const typography = loadTypography();
+    let result = value;
+    if (paraphraser) {
+      try {
+        const outcome = paraphraser.paraphraseText(result, language);
+        if (outcome && outcome.text) result = outcome.text;
+      } catch (error) {
+        return value;
+      }
+    }
+    if (typography) {
+      try {
+        const outcome = typography.normalize(result, language);
+        if (outcome && outcome.text) result = outcome.text;
+      } catch (error) {
+        return value;
+      }
+    }
+    result = String(result).trim();
+    if (!result) return value;
+    if (guard && !guard.compare(original, result).ok) return value;
+    return result;
+  }
+
+  function loadTypography() {
+    if (typeof globalThis !== "undefined" && globalThis.Typography) return globalThis.Typography;
+    if (typeof require === "function") return require("./typography.js");
+    return null;
+  }
+
   function loadPasses() {
     if (typeof globalThis !== "undefined" && globalThis.EditPasses) return globalThis.EditPasses;
     if (typeof require === "function") return require("./edit-passes.js");
@@ -356,15 +392,27 @@
       return extra.then((generated) => {
         const seen = new Set([original, ...rules]);
         const accepted = rules.slice();
+        // Вывод модели идёт через словарь и типографику до оценки, а не после.
+        // Раньше он судился как есть: вариант со штампом или длинным тире
+        // просто проигрывал и выбрасывался, хотя после одной словарной правки
+        // был бы лучшим. Мы теряли годные варианты на ровном месте.
+        //
+        // Помета «из модели» переносится на приведённый вид: по ней
+        // revision-candidates.js решает, применять ли семантический фильтр, и
+        // потерять её значит пропустить проверку смысла.
+        const fromModel = new Set();
         for (const candidate of Array.isArray(generated) ? generated : []) {
-          const value = String(candidate || "").trim();
+          const raw = String(candidate || "").trim();
+          if (!raw) continue;
+          const value = normalizeCandidate(raw, original, language, guard);
           if (!value || seen.has(value)) continue;
           seen.add(value);
           if (guard && !guard.compare(original, value).ok) continue;
           accepted.push(value);
+          fromModel.add(value);
         }
         return accepted.length || generatorWarning || (Array.isArray(generated) && generated.length)
-          ? { span, original, variants: accepted, generated: new Set(Array.isArray(generated) ? generated : []), generatorWarning, reasons: spot.reasons }
+          ? { span, original, variants: accepted, generated: fromModel, generatorWarning, reasons: spot.reasons }
           : null;
       });
     });
