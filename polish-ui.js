@@ -29,7 +29,7 @@
     const budget = { share: 0.35, limit: 5, shortlist: 2 };
     if (options.collect) budget.share = 1;
     if (!options.collect) root.RevisionPreview.clear();
-    options.report("Готовлю варианты с учётом контекста и стиля. Результат появится для просмотра перед применением.");
+    options.report("Редактирую текст. Варианты, прошедшие проверки, применяются автоматически.");
     // Bounds a stalled GPU request without changing the source or export state.
     const timer = setTimeout(cancel, 15 * 60 * 1000);
     try {
@@ -51,8 +51,9 @@
         options.report(`Подходящих вариантов не найдено. Текущий текст сохранён. ${ranker.summary()}${warnings ? ` ${warnings}` : " Менять удачную формулировку необязательно."}`, Boolean(warnings));
         return;
       }
-      options.report(`Для просмотра готово ${result.replaced} замен. ${ranker.summary()}${warnings ? ` ${warnings}` : ""}`, Boolean(warnings));
-      root.RevisionPreview.show(result, (accepted) => { if (current()) options.apply(accepted); });
+      const applied = root.AutomaticRevision.apply(options.text, result.details);
+      if (current()) options.apply(applied);
+      options.report(`Автоматически применено ${applied.replaced} замен. ${ranker.summary()}${warnings ? ` ${warnings}` : ""}`, Boolean(warnings));
     } catch (error) { if (current()) options.report(error.message || "Редактура недоступна.", true); }
     finally {
       clearTimeout(timer);

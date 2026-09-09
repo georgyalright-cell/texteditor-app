@@ -154,6 +154,9 @@
     const lost = [];
     const added = [];
     const notes = [];
+    // Literal reference integrity is independent of the calibrated A1 extractor.
+    const references = globalThis.ReferenceGuard || (typeof require === "function" ? require("./reference-guard.js") : null);
+    if (references && !references.compare(source, candidate)) lost.push({ type: "citation", value: "точное написание ссылок", count: 1 });
 
     for (const [key, count] of before) {
       const delta = count - (after.get(key) || 0);

@@ -150,11 +150,18 @@
   }
 
   function parseDocument(text) {
+    const references = globalThis.ReferenceGuard || (typeof require === "function" ? require("./reference-guard.js") : null);
+    let bibliography = false;
     return String(text || "")
       .split(/\n{2,}/)
       .map((block) => block.trim())
       .filter(Boolean)
-      .map(classifyBlock)
+      .map((block) => {
+        if (references && references.heading.test(block)) { bibliography = true; return classifyBlock(block); }
+        if (references && references.endMatter.test(block)) bibliography = false;
+        if (bibliography) return { type: "paragraph", text: block, protectedReference: true };
+        return classifyBlock(block);
+      })
       .filter(Boolean);
   }
 
@@ -283,14 +290,20 @@
     if (!sectionHeadings.length) return blocks;
 
     const counters = [];
+    const used = new Set(sectionHeadings.filter((b) => b.number).map((b) => b.number));
     for (const block of sectionHeadings) {
+      // Existing numbers are cross-reference targets. Only fill new headings;
+      // never silently change Section 2.4 into Section 1.1 in an excerpt.
+      if (block.number) { counters.splice(0, counters.length, ...block.number.split(".").map(Number)); continue; }
       const level = Math.max(1, Math.min(block.level, 6));
       counters.length = level;
       for (let index = 0; index < level; index += 1) {
         if (!counters[index]) counters[index] = index === level - 1 ? 0 : 1;
       }
       counters[level - 1] += 1;
-      const next = counters.slice(0, level).join(".");
+      let next = counters.slice(0, level).join(".");
+      while (used.has(next)) { counters[level - 1]++; next = counters.slice(0, level).join("."); }
+      used.add(next);
       if (next !== block.number) {
         changes.renumbered += 1;
         block.number = next;
@@ -305,10 +318,15 @@
    */
   function renumberCaptions(blocks, profile, changes) {
     const counters = { table: 0, figure: 0 };
+    const used = { table: new Set(), figure: new Set() };
+    for (const block of blocks) if (block.type === "caption" && block.number) used[block.kind].add(String(block.number));
     for (const block of blocks) {
       if (block.type !== "caption") continue;
-      counters[block.kind] += 1;
-      const expected = String(counters[block.kind]);
+      let expected = block.number;
+      if (!expected) {
+        do { counters[block.kind] += 1; } while (used[block.kind].has(String(counters[block.kind])));
+        expected = String(counters[block.kind]); used[block.kind].add(expected);
+      }
       const prefix = profile.captions[block.kind].prefix;
       if (block.number !== expected || !block.raw.startsWith(prefix)) changes.captions += 1;
       block.number = expected;
@@ -432,11 +450,7 @@
 
     const citations = checkCitations(bodyText, profile);
     if (citations.foreign) {
-      problems.push({
-        id: "citations",
-        title: "Ссылки в формате [12] вместо (Автор, год) по ГОСТ Р 7.0.5-2008 (§5.3)",
-        items: [`найдено ${citations.foreign}; замена требует данных об источнике и делается вручную`],
-      });
+      notes.push(`Числовые ссылки сохранены без изменения: ${citations.foreign}. Методичка (§5.3) предусматривает (Автор, год); автоматическая конвертация без сведений об источниках не выполняется.`);
     }
     if (citations.inText) notes.push(`Ссылок в формате (Автор, год): ${citations.inText}.`);
 

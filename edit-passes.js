@@ -990,7 +990,10 @@
         locale,
       ),
     ];
-    const edits = recommend(resolve(raw), { sentenceCount, discourseZone: settings.discourseZone });
+    const references = globalThis.ReferenceGuard || (typeof require === "function" ? require("./reference-guard.js") : null);
+    const frozen = references ? references.ranges(source) : [];
+    const eligible = raw.filter((edit) => !frozen.some((span) => edit.start < span.end && edit.end > span.start));
+    const edits = recommend(resolve(eligible), { sentenceCount, discourseZone: settings.discourseZone });
 
     const totalWords = countWords(source);
     const removable = edits.reduce((sum, edit) => sum + edit.removedWords, 0);
@@ -1044,14 +1047,16 @@
       result = result.slice(0, position) + letter.toLocaleUpperCase(locale) + result.slice(position + 1);
     }
 
-    result = result
+    const tidy = (text) => ({ text: text
       .replace(/[  \t]{2,}/g, " ")
       .replace(/[  \t]+([,.;:!?…])/g, "$1")
       .replace(/([(«"'])[  ]+/g, "$1")
       .replace(/\n[  \t]+/g, "\n")
       .replace(/[  \t]+\n/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
-      .trim();
+      .trim() });
+    const references = globalThis.ReferenceGuard || (typeof require === "function" ? require("./reference-guard.js") : null);
+    result = references ? references.transform(result, tidy).text : tidy(result).text;
 
     const guard = loadAnchorGuard();
     const check = guard ? guard.compare(source, result) : { ok: true, lost: [], added: [], notes: [] };

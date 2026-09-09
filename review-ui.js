@@ -17,7 +17,6 @@
     unknown: "мало данных",
   };
 
-  const CONFIDENCE_LABEL = { high: "безопасно", medium: "на ваше усмотрение" };
 
   const state = {
     baseText: "",
@@ -127,24 +126,12 @@
       );
     }
 
-    for (const edit of edits) {
-      const item = element("li", `edit-item is-${edit.confidence}`);
-      const label = element("label", "edit-toggle");
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = edit.accepted;
-      checkbox.addEventListener("change", () => {
-        if (checkbox.checked) state.accepted.add(edit.id);
-        else state.accepted.delete(edit.id);
-        rebuild({ keepList: true });
-      });
-      label.appendChild(checkbox);
-
+    for (const edit of edits.filter((edit) => edit.accepted && applied.ok)) {
+      const item = element("li", "edit-item");
       const body = element("div", "edit-body");
       const head = element("p", "edit-head");
       head.append(
         element("span", "edit-pass", edit.passLabel),
-        element("span", "edit-confidence", CONFIDENCE_LABEL[edit.confidence] || edit.confidence),
       );
       const diff = element("p", "edit-diff");
       diff.append(
@@ -159,7 +146,7 @@
           element("p", "edit-note", "Оставлено намеренно: связок должно остаться столько, сколько допускает зона жанра."),
         );
       }
-      item.append(label, body);
+      item.append(body);
       nodes.editList.appendChild(item);
     }
   }
@@ -234,15 +221,7 @@
     const list = element("ul", "checklist");
     for (const item of built.checklist) {
       const entry = element("li", "checklist-item");
-      const label = element("label", "checklist-label");
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = state.checklist && state.checklist[item.id] === true;
-      checkbox.addEventListener("change", () => {
-        state.checklist = state.checklist || {};
-        state.checklist[item.id] = checkbox.checked;
-      });
-      label.append(checkbox, element("span", "checklist-title", `${item.method} · ${item.title}`));
+      const label = element("p", "checklist-title", `${item.method} · ${item.title}`);
       entry.append(label, element("p", "checklist-prompt", item.prompt));
       list.appendChild(entry);
     }
@@ -433,7 +412,7 @@
       report: state.baseReport,
       discourseZone: zones.discourseShare,
     });
-    state.accepted = new Set(state.context.keepReviewed ? [] : state.proposal.edits.filter((edit) => edit.accepted).map((edit) => edit.id));
+    state.accepted = new Set(state.context.keepReviewed ? [] : state.proposal.edits.filter((edit) => edit.confidence === "high" && !edit.keptForZone).map((edit) => edit.id));
     if (root.UsageBaseline) root.UsageBaseline.record(state.baseReport);
     rebuild();
   }
@@ -458,11 +437,12 @@
    * Только подтверждённый результат становится новым исходником: после замены
    * предложений прежние спаны композиционных правок уже указывают не туда.
    */
-  function polishWithModel() {
+  async function polishWithModel() {
     if (!root.PolishUI || !state.workingText) return;
-    const operation = state.operation;
-    return root.PolishUI.run({
-      text: state.workingText,
+    let operation = state.operation;
+    const original = state.workingText;
+    const result = await root.AutomaticRevision.run({
+      text: original,
       language: state.report.language,
       isCurrent: () => operation === state.operation,
       report(message, error) {
@@ -475,8 +455,12 @@
           totalSentences: result.totalSentences, changedWordShare: result.changedWordShare,
         };
         update(result.text, Object.assign({}, state.context, { deepRevision, keepReviewed: true }));
-        nodes.editsGuard.textContent = `Применено ${result.replaced} выбранных замен. Числа и ссылки сверены.`;
+        operation = state.operation;
+        nodes.editsGuard.textContent = `Автоматически применено ${result.replaced} замен. Числа и ссылки сверены.`;
       },
+    });
+    if (result && operation === state.operation) root.RevisionPreview.showAutomatic(result, () => {
+      if (operation === state.operation) update(original, Object.assign({}, state.context, { deepRevision: null, keepReviewed: true }));
     });
   }
   function mount(handlers) {

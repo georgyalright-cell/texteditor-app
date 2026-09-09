@@ -91,7 +91,8 @@
     // Полный словарный проход был частью последней версии инструмента и не
     // должен зависеть от порога замкнутого цикла. Цикл запускается следом и
     // работает уже с тире, ритмом, антитезами и оставшимися штампами.
-    let paraphrased = root.RuleParaphraser.paraphraseText(outcome.text);
+    const references = root.ReferenceGuard || (typeof require === "function" ? require("./reference-guard.js") : null);
+    let paraphrased = references ? references.transform(outcome.text, (value) => root.RuleParaphraser.paraphraseText(value)) : root.RuleParaphraser.paraphraseText(outcome.text);
     // Словарь даёт несколько допустимых версий там, где у правила есть
     // варианты замены. Раньше выбор делал хеш абзаца — произвольно и
     // безальтернативно; теперь версии сравниваются по оценке. Слои рерайтера
@@ -155,6 +156,10 @@
     if (termsChanged) {
       finalText = String(text);
       guardWarnings.push("Базовые замены отменены: они затрагивали защищённые термины. Исходный текст сохранён.");
+    }
+    if (references && !references.compare(text, finalText)) {
+      finalText = outcome.text;
+      guardWarnings.push("Замены, затрагивающие ссылки, отменены. Ссылки сохранены как в исходнике.");
     }
 
     return {

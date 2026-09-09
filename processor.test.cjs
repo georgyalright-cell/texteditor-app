@@ -32,9 +32,9 @@ test("сохраняет числа и ссылки", () => {
   assert.match(result, /2,5/);
 });
 
-test("ссылка с вопросительным знаком не мешает удалить повтор предложения", () => {
+test("повторы предложений со ссылками сохраняются вместе с каждым вхождением ссылки", () => {
   const sentence = "Ссылка https://example.com/a?id=27 остаётся.";
-  assert.equal(processor.processText(`${sentence} ${sentence}`).text, sentence);
+  assert.equal(processor.processText(`${sentence} ${sentence}`).text, `${sentence} ${sentence}`);
 });
 
 test("соединяет случайный разрыв только перед строчной буквой", () => {

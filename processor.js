@@ -215,6 +215,12 @@
   }
 
   function processText(input) {
+    const guard = globalThis.ReferenceGuard || (typeof require === "function" ? require("./reference-guard.js") : null);
+    const result = guard ? guard.transform(input, processUnprotected) : processUnprotected(input);
+    return { ...result, inputChars: String(input || "").length, outputChars: result.text.length };
+  }
+
+  function processUnprotected(input) {
     const stats = {
       artifacts: 0,
       punctuation: 0,

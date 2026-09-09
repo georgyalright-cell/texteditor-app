@@ -100,6 +100,11 @@
   }
 
   function normalize(input, language) {
+    const guard = globalThis.ReferenceGuard || (typeof require === "function" ? require("./reference-guard.js") : null);
+    return guard ? guard.transform(input, (text) => normalizeUnprotected(text, language || detectLanguage(String(input || "")))) : normalizeUnprotected(input, language);
+  }
+
+  function normalizeUnprotected(input, language) {
     const stats = { quotes: 0, dashes: 0, ranges: 0, ellipsis: 0, nbsp: 0 };
     const source = String(input || "");
     if (!source.trim()) return { text: "", stats, language: language || "en" };

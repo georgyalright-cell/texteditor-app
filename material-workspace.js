@@ -7,16 +7,19 @@
     const preview = document.getElementById("materialSource");
     const status = document.getElementById("materialStatus");
     let projectMode = false, source = [], processed = null, generation = 0, busy = false, pendingPaste = false;
-    let modelJob = null, notes = [], changed = 0, pasteRevision = 0, contentRevision = 0;
+    let modelJob = null, modelUndo = null, notes = [], changed = 0, pasteRevision = 0, contentRevision = 0;
     let storageNotice = "", lastReport = "";
     const active = () => projectMode && toggle.checked;
     function report(message, error = false) {
-      lastReport = message; status.textContent = [message, storageNotice].filter(Boolean).join(" ");
+      lastReport = message;
+      const full = [message, storageNotice].filter(Boolean).join(" ");
+      status.textContent = full.length > 240 ? `${full.slice(0, 210)}… Подробности — в разделе замечаний.` : full;
+      document.getElementById("materialNotes").textContent = full;
       status.classList.toggle("is-error", error || Boolean(storageNotice));
     }
     function save() {
       const operation = generation;
-      root.MaterialDraft.save(source.length ? { version: 1, source, processed, changed, profileId: options.profile(), notes } : null).then(() => {
+      root.MaterialDraft.save(source.length ? { version: 1, source, processed, modelUndo, changed, profileId: options.profile(), notes } : null).then(() => {
         if (generation === operation && storageNotice) { storageNotice = ""; report(lastReport); }
       }).catch(() => {
         if (generation === operation) {
@@ -29,7 +32,7 @@
       generation++; pasteRevision++; pendingPaste = false;
       root.PolishUI.cancel(); root.RevisionPreview.clear();
     }
-    function invalidate(keepProcessed = false) { cancel(); contentRevision++; modelJob = null; if (!keepProcessed) processed = null; options.invalidate(); }
+    function invalidate(keepProcessed = false) { cancel(); contentRevision++; modelJob = null; if (!keepProcessed) { processed = null; modelUndo = null; } options.invalidate(); }
     function controls() {
       choice.hidden = !projectMode; status.hidden = !active();
       preview.hidden = !active() || !source.length;
@@ -67,13 +70,14 @@
           if (operation !== generation) return;
           const next = source.slice(); next[index] = { ...source[index], ...picture }; root.ClipboardDocument.validate(next);
           invalidate(true); source = next; if (processed) processed[index] = next[index]; save(); display(); summary();
+          if (modelUndo) { modelUndo.blocks[index] = structuredClone(next[index]); save(); }
         } catch (error) { if (operation === generation) report(error.message, true); }
         finally { if (ticket === pasteRevision) pendingPaste = false; options.update(); }
       }, (index) => {
         if (!root.confirm("Удалить это место фотографии вместе с его подписью и строкой источника?")) return;
         const group = root.DocumentLayout.units(source).find((u) => u.index === index);
         invalidate(true);
-        for (const i of group.indices.slice().reverse()) { source.splice(i, 1); if (processed) processed.splice(i, 1); }
+        for (const i of group.indices.slice().reverse()) { source.splice(i, 1); if (processed) processed.splice(i, 1); if (modelUndo) modelUndo.blocks.splice(i, 1); }
         save(); display(); summary();
       }, { profile: root.FormatProfiles.get(options.profile()), edit: editLayout });
       e.sourceText.value = root.ClipboardDocument.textOf(source); options.update(); controls();
@@ -86,12 +90,15 @@
         source[index].manualPlacement = true;
         if (processed) processed[index].manualPlacement = true;
         source = order.map((i) => source[i]); if (processed) processed = order.map((i) => processed[i]);
+        if (modelUndo) modelUndo.blocks = order.map((i) => modelUndo.blocks[i]);
       } else {
         source[index].layoutTitle = value.slice(0, 500);
         if (processed) processed[index].layoutTitle = source[index].layoutTitle;
+        if (modelUndo) modelUndo.blocks[index].layoutTitle = source[index].layoutTitle;
       }
       save(); if (order) display();
       if (processed) assemble(processed);
+      showChoices();
       if (order) report("Размещение и подпись сохранены. Принятые правки текста сохранены; неподтверждённые предложения сброшены.");
     }
     function acceptImport(imported) {
@@ -132,14 +139,14 @@
       return assembled;
     }
     function showChoices() {
-      if (!modelJob || !modelJob.details.length || !active()) return;
-      const job = modelJob, base = processed, operation = generation;
-      root.RevisionPreview.show({ source: job.text, details: job.details, replaced: job.details.length }, (accepted) => {
+      if (!modelUndo || !modelUndo.details.length || !active()) return;
+      const undo = modelUndo, base = processed, operation = generation;
+      root.RevisionPreview.showAutomatic({ details: undo.details, replaced: undo.details.length }, () => {
         if (operation !== generation || processed !== base || !active()) return;
         try {
-          processed = root.MaterialProcessing.apply(base, accepted.details); modelJob = null;
+          processed = undo.blocks; modelJob = null; modelUndo = null;
           save();
-          assemble(processed); report(`Применено ${accepted.replaced} подтверждённых замен. Таблицы и фото сохранены.`);
+          assemble(processed); report("Локальная редактура отменена. Базовая обработка, таблицы и фото сохранены.");
         } catch (error) { report(error.message, true); }
       });
     }
@@ -170,7 +177,7 @@
         }
         assemble(processed);
         if (!root.Generator.supported()) { report(`Документ собран: изменено абзацев ${changed}. WebGPU недоступен — выполнена базовая обработка. ${notes.join(" ")}`); return; }
-        if (!modelJob) modelJob = { ...root.MaterialProcessing.jobs(processed), cursor: 0, details: [] };
+        if (!modelJob) modelJob = { ...root.MaterialProcessing.jobs(processed), base: processed, cursor: 0, details: [] };
         for (; modelJob.cursor < modelJob.jobs.length;) {
           if (!current()) return;
           const job = modelJob, piece = job.jobs[job.cursor]; let result = null;
@@ -182,12 +189,16 @@
           if (!result) { report(progress + "Порция не завершена. Нажмите «Продолжить редактуру» или скачайте базовый DOCX.", true); break; }
           const rankingWarning = /недоступна|пропущено/u.test(result.rankingSummary || "") ? [result.rankingSummary] : [];
           notes = [...new Set([...notes, ...(result.generatorWarnings || []), ...(result.warnings || []), ...rankingWarning])];
-          job.details.push(...result.details.map((detail) => ({ ...detail, start: detail.start + piece.offset, end: detail.end + piece.offset })));
+          const nextDetails = [...job.details, ...result.details.map((detail) => ({ ...detail, start: detail.start + piece.offset, end: detail.end + piece.offset }))];
+          processed = root.MaterialProcessing.apply(job.base, nextDetails);
+          job.details = nextDetails;
+          if (nextDetails.length) modelUndo = { blocks: job.base, details: nextDetails };
           job.cursor++;
+          save(); assemble(processed);
         }
         if (current()) {
           showChoices();
-          if (modelJob.cursor === modelJob.jobs.length) report(`Документ собран. Базово изменено абзацев: ${changed}. Для подтверждения: ${modelJob.details.length} замен. Не каждая фраза нуждается в замене. ${notes.join(" ")}`);
+          if (modelJob.cursor === modelJob.jobs.length) report(`Документ собран. Базово изменено абзацев: ${changed}. Автоматически применено: ${modelJob.details.length} замен. ${notes.join(" ")}`);
         }
       } catch (error) { if (current()) report(error.message || "Не удалось собрать документ.", true); }
       finally {
@@ -208,12 +219,15 @@
       source = root.DocumentLayout.prepare(draft.source); notes = Array.isArray(draft.notes) ? draft.notes : [];
       processed = draft.processed ? draft.processed.map((b, i) => source[i].type !== draft.source[i].type ? structuredClone(source[i]) : b) : null;
       changed = Number(draft.changed) || 0;
-      if (active()) display(); summary();
+      if (draft.modelUndo && Array.isArray(draft.modelUndo.details) && draft.modelUndo.blocks?.length === source.length) {
+        root.ClipboardDocument.validate(draft.modelUndo.blocks); modelUndo = draft.modelUndo;
+      }
+      if (active()) { display(); showChoices(); } summary();
     }).catch(() => report("Сохранённый черновик недоступен. Можно вставить материал заново.", true));
     return {
       active, controls, run, cancel, busy: () => busy,
-      setMode(value) { if (value !== projectMode) cancel(); projectMode = value; if (active() && source.length) display(); controls(); },
-      invalidate(keepProcessed = false) { cancel(); modelJob = null; if (!keepProcessed) { contentRevision++; processed = null; } else save(); },
+      setMode(value) { if (value !== projectMode) cancel(); projectMode = value; if (active() && source.length) { display(); showChoices(); } controls(); },
+      invalidate(keepProcessed = false) { cancel(); modelJob = null; if (!keepProcessed) { contentRevision++; processed = null; modelUndo = null; } else { save(); showChoices(); } },
       clear() { invalidate(); source = []; notes = []; save(); display(); report(""); },
     };
   }

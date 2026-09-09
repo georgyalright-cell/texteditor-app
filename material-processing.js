@@ -2,8 +2,9 @@
   "use strict";
   function textMap(blocks) {
     let text = ""; const ranges = [];
+    const protectedBlocks = root.ReferenceGuard ? root.ReferenceGuard.protectedBlocks(blocks) : [];
     for (const [index, block] of blocks.entries()) {
-      if (block.type !== "paragraph") continue;
+      if (block.type !== "paragraph" || protectedBlocks[index]) continue;
       if (text) text += "\n\n";
       ranges.push({ index, start: text.length, end: text.length + block.text.length }); text += block.text;
     }
@@ -13,9 +14,14 @@
     const mapping = textMap(blocks), result = [];
     for (const range of mapping.ranges) {
       const text = blocks[range.index].text;
-      const spans = root.EditPasses.paragraphSpans(text).flatMap((p) => root.EditPasses.sentenceSpans(p.text, p.start));
-      for (let i = 0; i < spans.length; i += 5) {
-        const group = spans.slice(i, i + 5), start = group[0].start, end = group[group.length - 1].end;
+      const frozen = root.ReferenceGuard ? root.ReferenceGuard.ranges(text).filter((r) => r.bibliography) : [];
+      const spans = root.EditPasses.paragraphSpans(text).flatMap((p) => root.EditPasses.sentenceSpans(p.text, p.start))
+        .filter((s) => !frozen.some((r) => s.start < r.end && s.end > r.start));
+      for (let i = 0; i < spans.length;) {
+        const start = spans[i].start; let end = spans[i++].end, size = 1;
+        while (i < spans.length && size < 5 && !frozen.some((r) => end < r.end && spans[i].start > r.start)) {
+          end = spans[i++].end; size++;
+        }
         result.push({ text: text.slice(start, end), offset: range.start + start });
       }
     }
@@ -35,9 +41,10 @@
   }
   async function base(blocks, options) {
     const result = structuredClone(blocks), warnings = new Set(); let changed = 0;
+    const protectedBlocks = root.ReferenceGuard ? root.ReferenceGuard.protectedBlocks(blocks) : [];
     for (const [index, block] of result.entries()) {
       if (!options.isCurrent()) return null;
-      if (block.type === "paragraph") {
+      if (block.type === "paragraph" && !protectedBlocks[index]) {
         const processed = options.process(block.text);
         // Existing scripts remain intact; a final anchor check also protects
         // the surrounding document from a changed number/citation in one block.

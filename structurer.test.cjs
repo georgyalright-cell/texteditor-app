@@ -43,12 +43,12 @@ test("короткий абзац с точкой заголовком не сч
   assert.equal(block.type, "paragraph");
 });
 
-test("подпись к таблице распознаётся и получает сквозной номер", () => {
-  const source = ["Таблица 7 — Допущения", "Текст ссылается на Table 1 в этом же абзаце."].join("\n\n");
+test("подпись к таблице сохраняет номер для существующих ссылок", () => {
+  const source = ["Таблица 7 — Допущения", "Текст ссылается на Table 7 в этом же абзаце."].join("\n\n");
   const outcome = structurer.applyProfile(source, "hse-business-plan");
   const caption = outcome.blocks.find((block) => block.type === "caption");
   assert.equal(caption.prefix, "Table");
-  assert.equal(caption.number, "1");
+  assert.equal(caption.number, "7");
   assert.equal(caption.alignment, "right");
   assert.equal(caption.position, "above");
 });
@@ -123,7 +123,8 @@ test("расшифрованная при первом упоминании аб
 test("отмечает ссылки в формате [12] как не соответствующие ГОСТ", () => {
   const source = "1. Executive Summary\n\nПо данным обзора [14] рынок растёт.";
   const outcome = structurer.applyProfile(source, "hse-business-plan");
-  assert.ok(outcome.report.problems.some((item) => item.id === "citations"));
+  assert.ok(outcome.report.notes.some((item) => item.includes("Числовые ссылки сохранены")));
+  assert.ok(outcome.text.includes("[14]"));
 });
 
 test("замечает приложение, на которое нет ссылки в тексте", () => {

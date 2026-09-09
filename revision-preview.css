@@ -1,5 +1,8 @@
 .revision-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
 .revision-preview { margin: 1.5rem 0; padding: 1.2rem; border: 1px solid #b9c2d0; border-radius: 12px; }
+.revision-preview summary, .processing-details > summary { cursor: pointer; font-weight: 600; }
+.processing-details { margin: 1rem 0; padding: 1rem; border: 1px solid #b9c2d0; border-radius: 12px; }
+.processing-details > .result-note { max-height: 12rem; overflow: auto; }
 .revision-preview h2 { margin-top: 0; font-size: 1.4rem; }
 .revision-preview p { line-height: 1.55; }
 .revision-preview ol { padding-left: 1.5rem; }
