@@ -122,7 +122,7 @@
 
     if (!edits.length) {
       nodes.editList.appendChild(
-        element("li", "edit-empty", "Безопасных правок не нашлось. Смотрите список ниже — там то, что правит автор."),
+        element("li", "edit-empty", "Проверка завершена. Дополнительные композиционные замены не потребовались."),
       );
     }
 
@@ -151,115 +151,6 @@
     }
   }
 
-  function renderManual(proposal) {
-    clear(nodes.manualList);
-    if (!proposal.manual.length && !proposal.hints.length) return;
-
-    if (proposal.manual.length) {
-      nodes.manualList.appendChild(element("h3", "review-subtitle", "Правит автор: замена меняет падежи"));
-      const list = element("ul", "manual-list");
-      for (const item of proposal.manual) {
-        const entry = element("li", "manual-item");
-        entry.append(
-          element("p", "manual-fragment", `«${item.context}»`),
-          element("p", "manual-advice", item.advice),
-        );
-        list.appendChild(entry);
-      }
-      nodes.manualList.appendChild(list);
-    }
-
-    if (proposal.hints.length) {
-      nodes.manualList.appendChild(element("h3", "review-subtitle", "Методы, которые код не выполняет"));
-      const list = element("ul", "hint-list");
-      for (const hint of proposal.hints) {
-        const entry = element("li", "hint-item");
-        entry.append(
-          element("p", "hint-head", `${hint.method} · ${hint.label}`),
-          element("p", "hint-text", hint.text),
-        );
-        list.appendChild(entry);
-      }
-      nodes.manualList.appendChild(list);
-    }
-  }
-
-  function renderAsk(text, report) {
-    const api = root.Elicitation;
-    if (!api) return;
-    const built = api.build(text, {
-      language: report.language,
-      strictSections: state.context.strictSections,
-      headings: state.context.headings,
-      targetDensity: (metricsApi().genre(report.genreId).zones.anchorDensity || {}).min,
-    });
-
-    clear(nodes.questionList);
-    nodes.askCount.textContent = built.questions.length ? `${built.questions.length}` : "0";
-    if (!built.questions.length) {
-      nodes.questionList.appendChild(
-        element("p", "ask-empty", "Плотность конкретики в норме во всех абзацах: вопросов к автору нет."),
-      );
-    }
-    let currentScope = "";
-    for (const question of built.questions) {
-      if (question.scope !== currentScope) {
-        currentScope = question.scope;
-        const head = element("p", "ask-scope", currentScope);
-        nodes.questionList.appendChild(head);
-      }
-      const item = element("div", "ask-item");
-      item.append(
-        element("p", "ask-question", question.question),
-        element("p", "ask-excerpt", `«${question.excerpt}»`),
-      );
-      nodes.questionList.appendChild(item);
-    }
-
-    clear(nodes.checklistBox);
-    nodes.checklistBox.appendChild(element("h3", "review-subtitle", "Чеклист: методы 12–17"));
-    const list = element("ul", "checklist");
-    for (const item of built.checklist) {
-      const entry = element("li", "checklist-item");
-      const label = element("p", "checklist-title", `${item.method} · ${item.title}`);
-      entry.append(label, element("p", "checklist-prompt", item.prompt));
-      list.appendChild(entry);
-    }
-    nodes.checklistBox.appendChild(list);
-
-    clear(nodes.terminologyBox);
-    if (built.terminology.length) {
-      nodes.terminologyBox.appendChild(element("h3", "review-subtitle", "31 · дрейф терминологии"));
-      const drift = element("ul", "drift-list");
-      for (const group of built.terminology) {
-        drift.appendChild(
-          element("li", null, group.variants.map((variant) => `${variant.form} (${variant.count})`).join("  ·  ")),
-        );
-      }
-      nodes.terminologyBox.append(
-        drift,
-        element("p", "review-note", "Выберите одно написание и держитесь его — либо оставьте дрейф осознанно."),
-      );
-    }
-    if (built.headings && built.headings.enabled && built.headings.parallel) {
-      nodes.terminologyBox.append(
-        element("h3", "review-subtitle", "30 · параллельные заголовки"),
-        element("p", "review-note", built.headings.note),
-      );
-    }
-  }
-
-  /**
-   * Слабые места. Отчёт говорит, что не так с текстом целиком; этот список
-   * говорит, где именно. Правка руками десятой части текста меняет профиль
-   * сильнее любого пасса, и весь вопрос в том, какой именно десятой.
-   */
-  /**
-   * Сравнение с собственной историей. Формулировки подобраны так, чтобы эту
-   * базу нельзя было прочесть как норму: сюда приносят машинные черновики,
-   * и «типичнее обычного» здесь означает «похоже на остальные ваши
-   * черновики», а не «похоже на человека».
-   */
   function renderBaseline(report) {
     const api = root.UsageBaseline;
     if (!api || !nodes.reviewBaseline) return;
@@ -283,32 +174,6 @@
     nodes.reviewBaseline.textContent =
       `Против ${summary.count} прежних текстов: ${parts.join("; ")}. ` +
       "Это сравнение с вашими черновиками, а не с человеческой нормой — сюда приносят именно машинный текст.";
-  }
-
-  function renderWeakSpots(text, report) {
-    const api = root.WeakSpots;
-    if (!api || !nodes.weakList) return;
-    clear(nodes.weakList);
-    const spots = api.worst(text, { language: report.language, share: 0.15, limit: 8 });
-    nodes.weakCount.textContent = spots.length ? String(spots.length) : "0";
-    if (!spots.length) {
-      nodes.weakNote.textContent =
-        "Предложений с явными признаками машинности не осталось. Дальше решает содержание, а не формулировки.";
-      return;
-    }
-    nodes.weakNote.textContent =
-      "Эти предложения тянут текст вниз сильнее прочих. Перепишите их своими словами — это даёт больше, " +
-      "чем любая автоматическая правка остального текста.";
-    for (const spot of spots) {
-      const item = element("li", "weak-item");
-      const head = element("p", "weak-head");
-      head.append(
-        element("span", "weak-score", String(spot.score)),
-        element("span", "weak-reasons", spot.reasons.join(" · ")),
-      );
-      item.append(head, element("p", "weak-text", spot.text));
-      nodes.weakList.appendChild(item);
-    }
   }
 
   function renderHistory() {
@@ -379,9 +244,6 @@
 
     renderReport(state.report);
     renderEdits(edits, applied, keepList);
-    renderManual(state.proposal);
-    renderAsk(state.workingText, state.report);
-    renderWeakSpots(state.workingText, state.report);
     renderBaseline(state.report);
     renderHistory();
 
@@ -433,7 +295,7 @@
   }
 
   /**
-   * Продолжение единого запуска. Загрузка объяснена рядом с основной кнопкой.
+   * Необязательный проход по отдельной кнопке; обычная обработка модель не запускает.
    * Только подтверждённый результат становится новым исходником: после замены
    * предложений прежние спаны композиционных правок уже указывают не туда.
    */
@@ -474,15 +336,7 @@
       editsCount: document.querySelector("#editsCount"),
       editsGuard: document.querySelector("#editsGuard"),
       editList: document.querySelector("#editList"),
-      manualList: document.querySelector("#manualList"),
-      askCount: document.querySelector("#askCount"),
-      questionList: document.querySelector("#questionList"),
-      checklistBox: document.querySelector("#checklistBox"),
-      terminologyBox: document.querySelector("#terminologyBox"),
       historyList: document.querySelector("#historyList"),
-      weakList: document.querySelector("#weakList"),
-      weakNote: document.querySelector("#weakNote"),
-      weakCount: document.querySelector("#weakCount"),
       reviewBaseline: document.querySelector("#reviewBaseline"),
       acceptSafeButton: document.querySelector("#acceptSafeButton"),
       clearEditsButton: document.querySelector("#clearEditsButton"),

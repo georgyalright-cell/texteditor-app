@@ -46,11 +46,11 @@ test("production не загружает исполняемый код с вне
   assert.match(transformers, /from["']\.\/ort\.webgpu\.bundle\.min\.mjs["']/u);
 });
 
-test("глубокая редакция использует одну существующую кнопку и локальный генератор", () => {
+test("глубокая редакция запускается отдельной кнопкой и использует локальный генератор", () => {
   const index = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
   const review = fs.readFileSync(path.join(__dirname, "polish-ui.js"), "utf8");
   assert.equal((index.match(/id=["']processButton["']/gu) || []).length, 1);
-  assert.equal((index.match(/id=["']polishButton["']/gu) || []).length, 0);
+  assert.equal((index.match(/id=["']polishButton["']/gu) || []).length, 1);
   assert.match(index, /processing-run\.js\?v=/u);
   assert.match(index, /<details[^>]*id="neuralAssistant"/u);
   assert.match(review, /preferFresh:\s*true/u);

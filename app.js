@@ -173,6 +173,9 @@
     const hasParts = Boolean(project && project.parts.length);
     elements.sourceCount.textContent = characterLabel(elements.sourceText.value.length);
     elements.processButton.disabled = !hasSource || processing.busy();
+    const polishButton = document.getElementById("polishButton");
+    polishButton.disabled = !hasResult || !activeReview || processing.busy() || !window.Generator.supported();
+    polishButton.textContent = "Дополнительно обработать моделью";
     elements.clearButton.disabled = !hasSource && !hasResult;
     elements.downloadButton.disabled = !hasResult;
     elements.downloadDocxButton.disabled = !hasResult || !currentBlocks.length;
@@ -607,6 +610,10 @@
   });
   elements.fileInput.addEventListener("change", () => loadFile(elements.fileInput.files[0]));
   elements.processButton.addEventListener("click", runProcessing);
+  document.getElementById("polishButton").addEventListener("click", () => {
+    if (material && material.active()) return material.run({ withModel: true });
+    if (currentResult && activeReview) return processing.run({ modelOnly: true });
+  });
   document.getElementById("polishCancelButton").addEventListener("click", () => { processing.cancel(); if (material) material.cancel(); });
   elements.addPartButton.addEventListener("click", addCurrentPart);
   elements.assembleProjectButton.addEventListener("click", assembleProject);

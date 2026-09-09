@@ -7,13 +7,14 @@
     return {
       busy: () => active,
       cancel() { revision += 1; options.cancel(); },
-      async run() {
+      async run({ modelOnly = false } = {}) {
         if (active) return false;
         active = true;
         const operation = ++revision;
         options.busy(true);
         try {
-          if (!options.base() || operation !== revision) return false;
+          // Default clicks/keyboard shortcuts never initialise models, even cached ones.
+          if (!modelOnly) return Boolean(options.base()) && operation === revision;
           if (!options.supported()) {
             options.notice("Базовая обработка готова. Локальная модель не запущена: WebGPU недоступен. TXT, DOCX и сборка работают без неё.");
             return true;

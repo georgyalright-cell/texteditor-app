@@ -12,12 +12,12 @@
     <meta name="referrer" content="no-referrer" />
     <title>TextEditor — обработка и сборка работ</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23108764'/%3E%3Cpath d='M8 9h16M16 9v15' stroke='white' stroke-width='3'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="styles.css?v=47" />
-    <link rel="stylesheet" href="workspace.css?v=47" />
-    <link rel="stylesheet" href="review.css?v=47" />
-    <link rel="stylesheet" href="neural-scorer.css?v=47" />
-    <link rel="stylesheet" href="help.css?v=47" />
-    <link rel="stylesheet" href="revision-preview.css?v=47" />
+    <link rel="stylesheet" href="styles.css?v=48" />
+    <link rel="stylesheet" href="workspace.css?v=48" />
+    <link rel="stylesheet" href="review.css?v=48" />
+    <link rel="stylesheet" href="neural-scorer.css?v=48" />
+    <link rel="stylesheet" href="help.css?v=48" />
+    <link rel="stylesheet" href="revision-preview.css?v=48" />
   </head>
   <body>
     <header class="site-header">
@@ -144,7 +144,7 @@
             <label id="wholeDocumentChoice" class="material-choice" hidden>
               <input type="checkbox" id="wholeDocument" checked /> Работа целиком из буфера
               <small>Текст, прямоугольные таблицы, PNG/JPEG. Снимите флажок, чтобы добавлять отдельные части как раньше.</small>
-              <small>Модель обрабатывает абзацы порциями: большой документ может занять десятки минут. Первая загрузка — около 1,5 ГБ, затем используются сохранённые веса. Можно остановить и скачать базовый DOCX.</small>
+              <small>Обработка и сборка работают без модели. Дополнительную редактуру моделью можно запустить отдельно после получения результата.</small>
             </label>
             <p id="materialStatus" class="status" role="status" aria-live="polite" hidden></p>
             <div class="part-fields" id="partFields" hidden>
@@ -202,6 +202,7 @@
           <button class="button button-primary" id="processButton" type="button" disabled>
             Обработать текст
           </button>
+          <button class="button button-secondary" id="polishButton" type="button" disabled aria-describedby="polishDownloadNote">Дополнительно обработать моделью</button>
           <button class="button button-secondary" id="polishCancelButton" type="button" hidden>Остановить редактуру</button>
           <button class="button button-accent" id="addPartButton" type="button" disabled hidden>
             Добавить часть в работу
@@ -224,8 +225,8 @@
         </div>
 
         <p class="polish-download-note" id="polishDownloadNote">
-          Один запуск: обработка → проверка → готовый результат, без выбора галочек.
-          В первый раз загрузится около 1,5 ГБ моделей; обработка может занять несколько минут. Затем используется кэш браузера. Без WebGPU работает базовая обработка. Сравнение и отмена — под результатом; прохождение AI-детекторов не гарантируется.
+          Обычная обработка применяет все встроенные правила без модели и без выбора галочек.
+          Модель запускается только кнопкой «Дополнительно обработать моделью»: нужен WebGPU, первая загрузка — около 1,5 ГБ, затем используется кэш браузера. Большой документ может занять десятки минут. Сравнение и отмена — под результатом.
         </p>
 
         <section class="model-load-status" id="modelLoadStatus" hidden aria-labelledby="modelLoadTitle">
@@ -290,24 +291,6 @@
             </div>
             <p class="edits-guard" id="editsGuard" aria-live="polite"></p>
             <ul class="edit-list" id="editList"></ul>
-            <div id="manualList"></div>
-          </div>
-        </details>
-
-        <details class="review-block">
-          <summary>Слабые места — что править рукой <span class="review-badge" id="weakCount"></span></summary>
-          <div class="review-block-body">
-            <p class="review-note" id="weakNote"></p>
-            <ol class="weak-list" id="weakList"></ol>
-          </div>
-        </details>
-
-        <details class="review-block">
-          <summary>Чего не хватает — вопросы автору <span class="review-badge" id="askCount"></span></summary>
-          <div class="review-block-body">
-            <div id="questionList"></div>
-            <div id="checklistBox"></div>
-            <div id="terminologyBox"></div>
           </div>
         </details>
 
@@ -326,7 +309,7 @@
             <h2 id="neural-title">Локальная нейрооценка</h2>
             <p>
               Две небольшие языковые модели сравнят исходник и результат по реальной перплексии и Binoculars.
-              Основная обработка уже включает генератор, проверку смысла и перплексию. Эта диагностика не редактирует текст и не нужна для основного запуска.
+              Обычная обработка работает без моделей; дополнительная редактура запускается отдельной кнопкой. Эта диагностика не редактирует текст и не нужна для основного запуска.
               Текст остаётся на устройстве; сервер и ключи не нужны.
               Первая загрузка отдельной диагностики — около 1 ГБ; уже сохранённые модели используются из кэша.
             </p>
@@ -382,7 +365,7 @@
             <li>Вставьте черновик или выберите файл.</li>
             <li>Нажмите «Обработать текст».</li>
             <li>Язык определяется автоматически: английский — B2–C1 Business English, русский — естественный академический язык для университетских работ разных тем. Настраивать стиль или загружать образцы не нужно; оформление сохраняется по выбранному формату документа.</li>
-            <li>Модели запустятся автоматически после правил: генерация → эмбеддинги → сравнение перплексии. Первая полная загрузка — около 1,5 ГБ; несколько минут ожидания. Статус под кнопками показывает текущую модель, файл и этап. Можно остановить редактуру и оставить базовый результат.</li>
+            <li>Готовый результат можно сразу скачать: модели не загружаются. При необходимости нажмите «Дополнительно обработать моделью»: генерация → эмбеддинги → сравнение перплексии. Первая полная загрузка — около 1,5 ГБ. Статус под кнопками показывает текущую модель, файл и этап; редактуру можно остановить.</li>
             <li>Проверенные формулировки применяются автоматически. В разделе «Применённые формулировки» можно сравнить результат и отменить локальную редактуру. Перед отправкой прочитайте текст: проверка сходства не заменяет проверку фактов.</li>
             <li>Скачайте итог в DOCX или TXT.</li>
           </ol>
@@ -396,10 +379,10 @@
             <li>Для целой работы оставьте флажок «Работа целиком из буфера». Вставьте работу целиком: текст, заголовки, прямоугольные таблицы и PNG/JPEG. Markdown-таблицы тоже распознаются.</li>
             <li>Проверьте расположение. Объект с номером в подписи ставится после первого явного упоминания (например, «Table 2») в том же разделе. При повторяющихся номерах или отсутствии ссылки порядок сохраняется. «Выше / Ниже» перемещают объект вместе с подписью и источником внутри раздела. Название можно изменить в поле подписи; текст и цифры таблиц здесь не редактируются.</li>
             <li>Подписи таблиц располагаются сверху, рисунков — снизу. Исходные номера сохраняются, чтобы не нарушить ссылки; объекту без подписи добавляется свободный номер без выдуманного названия или источника. Для недоступных фото прикрепите файлы на указанные места. Объединённые ячейки, таблицы/фото внутри списков и ячеек вынесите отдельными блоками. Новая вставка заменяет материал с подтверждением.</li>
-            <li>Нажмите «Обработать и собрать документ». Базовые правила проходят все обычные абзацы; таблицы, списки и фотографии сохраняются без перефразирования. Модель проходит текст порциями до пяти предложений, а не только начало работы. Проверенные варианты применяются автоматически. Большая работа может занять десятки минут; остановленный проход продолжается в этой вкладке.</li>
+            <li>Нажмите «Обработать и собрать документ»: правила проходят все обычные абзацы без модели; таблицы, списки и фотографии сохраняются без перефразирования. DOCX уже можно скачать. При необходимости нажмите «Дополнительно обработать моделью»: она проходит текст порциями до пяти предложений, проверенные варианты применяются автоматически. Большая работа может занять десятки минут; остановленный проход продолжается отдельной кнопкой в этой вкладке.</li>
             <li>Исходник, обработанный результат и отмена последнего локального прохода сохраняются в этом браузере. После перезагрузки можно снова собрать их; незавершённые предложения модели и позиция прохода не сохраняются. Очистка данных браузера удаляет черновик. Для полной работы скачайте DOCX, не TXT.</li>
             <li>Проверьте недостающие поля и разделы. Они не сочиняются автоматически. В Word обновите оглавление через «Обновить поле». Если вставили собственный титульный лист или оглавление, проверьте дубли: служебные страницы выбранного шаблона добавляются отдельно.</li>
-            <li>Чтобы собирать работу по частям как раньше, снимите флажок: выберите раздел → обработайте текст → подтвердите варианты → «Добавить часть в работу». Затем закройте пункты готовности и соберите документ. Сохранённая библиотека частей не смешивается автоматически с целой вставкой.</li>
+            <li>Чтобы собирать работу по частям как раньше, снимите флажок: выберите раздел → обработайте текст → при необходимости запустите модель → «Добавить часть в работу». Затем закройте пункты готовности и соберите документ. Сохранённая библиотека частей не смешивается автоматически с целой вставкой.</li>
           </ol>
         </section>
       </div>
@@ -414,57 +397,58 @@
       </p>
     </dialog>
 
-    <script src="vendor/mammoth/mammoth.browser.min.js?v=47" defer></script>
-    <script src="vendor/jszip/jszip.min.js?v=47" defer></script>
-    <script src="vendor/sheetjs/xlsx.full.min.js?v=47" defer></script>
-    <script src="format-profiles.js?v=47" defer></script>
-    <script src="reference-guard.js?v=47" defer></script>
-    <script src="typography.js?v=47" defer></script>
-    <script src="humanizer-metrics.js?v=47" defer></script>
-    <script src="anchor-guard.js?v=47" defer></script>
-    <script src="text-metrics.js?v=47" defer></script>
-    <script src="edit-passes.js?v=47" defer></script>
-    <script src="elicitation.js?v=47" defer></script>
-    <script src="revision-store.js?v=47" defer></script>
-    <script src="processor.js?v=47" defer></script>
-    <script src="paraphraser.js?v=47" defer></script>
-    <script src="rewriter.js?v=47" defer></script>
-    <script src="deep-revision.js?v=47" defer></script>
-    <script src="candidate-select.js?v=47" defer></script>
-    <script src="weak-spots.js?v=47" defer></script>
-    <script src="usage-baseline.js?v=47" defer></script>
-    <script src="humanizer-engine.js?v=47" defer></script>
-    <script src="text-pipeline.js?v=47" defer></script>
-    <script src="structurer.js?v=47" defer></script>
-    <script src="document-builder.js?v=47" defer></script>
-    <script src="document-images.js?v=47" defer></script>
-    <script src="docx-writer.js?v=47" defer></script>
-    <script src="document-layout.js?v=47" defer></script>
-    <script src="clipboard-document.js?v=47" defer></script>
-    <script src="document-clipboard.js?v=47" defer></script>
-    <script src="document-reader.js?v=47" defer></script>
-    <script src="work-project.js?v=47" defer></script>
-    <script src="project-view.js?v=47" defer></script>
-    <script src="neural-scorer.js?v=47" defer></script>
-    <script src="generator-core.js?v=47" defer></script>
-    <script src="generator.js?v=47" defer></script>
-    <script src="business-english.js?v=47" defer></script>
-    <script src="meaning-guard.js?v=47" defer></script>
-    <script src="revision-quality.js?v=47" defer></script>
-    <script src="revision-candidates.js?v=47" defer></script>
-    <script src="semantic-scorer.js?v=47" defer></script>
-    <script src="revision-preview.js?v=47" defer></script>
-    <script src="neural-ranking.js?v=47" defer></script>
-    <script src="polish-ui.js?v=47" defer></script>
-    <script src="review-ui.js?v=47" defer></script>
-    <script src="help-dialog.js?v=47" defer></script>
-    <script src="processing-run.js?v=47" defer></script>
-    <script src="material-processing.js?v=47" defer></script>
-    <script src="automatic-revision.js?v=47" defer></script>
-    <script src="material-view.js?v=47" defer></script>
-    <script src="material-draft.js?v=47" defer></script>
-    <script src="material-workspace.js?v=47" defer></script>
-    <script src="app-export.js?v=47" defer></script>
-    <script src="app.js?v=47" defer></script>
+    <script src="vendor/mammoth/mammoth.browser.min.js?v=48" defer></script>
+    <script src="vendor/jszip/jszip.min.js?v=48" defer></script>
+    <script src="vendor/sheetjs/xlsx.full.min.js?v=48" defer></script>
+    <script src="format-profiles.js?v=48" defer></script>
+    <script src="reference-guard.js?v=48" defer></script>
+    <script src="typography.js?v=48" defer></script>
+    <script src="humanizer-metrics.js?v=48" defer></script>
+    <script src="anchor-guard.js?v=48" defer></script>
+    <script src="text-metrics.js?v=48" defer></script>
+    <script src="edit-passes.js?v=48" defer></script>
+    <script src="elicitation.js?v=48" defer></script>
+    <script src="revision-store.js?v=48" defer></script>
+    <script src="processor.js?v=48" defer></script>
+    <script src="paraphraser.js?v=48" defer></script>
+    <script src="rewriter.js?v=48" defer></script>
+    <script src="deep-revision.js?v=48" defer></script>
+    <script src="candidate-select.js?v=48" defer></script>
+    <script src="weak-spots.js?v=48" defer></script>
+    <script src="usage-baseline.js?v=48" defer></script>
+    <script src="humanizer-engine.js?v=48" defer></script>
+    <script src="grammar-edits.js?v=48" defer></script>
+    <script src="text-pipeline.js?v=48" defer></script>
+    <script src="structurer.js?v=48" defer></script>
+    <script src="document-builder.js?v=48" defer></script>
+    <script src="document-images.js?v=48" defer></script>
+    <script src="docx-writer.js?v=48" defer></script>
+    <script src="document-layout.js?v=48" defer></script>
+    <script src="clipboard-document.js?v=48" defer></script>
+    <script src="document-clipboard.js?v=48" defer></script>
+    <script src="document-reader.js?v=48" defer></script>
+    <script src="work-project.js?v=48" defer></script>
+    <script src="project-view.js?v=48" defer></script>
+    <script src="neural-scorer.js?v=48" defer></script>
+    <script src="generator-core.js?v=48" defer></script>
+    <script src="generator.js?v=48" defer></script>
+    <script src="business-english.js?v=48" defer></script>
+    <script src="meaning-guard.js?v=48" defer></script>
+    <script src="revision-quality.js?v=48" defer></script>
+    <script src="revision-candidates.js?v=48" defer></script>
+    <script src="semantic-scorer.js?v=48" defer></script>
+    <script src="revision-preview.js?v=48" defer></script>
+    <script src="neural-ranking.js?v=48" defer></script>
+    <script src="polish-ui.js?v=48" defer></script>
+    <script src="review-ui.js?v=48" defer></script>
+    <script src="help-dialog.js?v=48" defer></script>
+    <script src="processing-run.js?v=48" defer></script>
+    <script src="material-processing.js?v=48" defer></script>
+    <script src="automatic-revision.js?v=48" defer></script>
+    <script src="material-view.js?v=48" defer></script>
+    <script src="material-draft.js?v=48" defer></script>
+    <script src="material-workspace.js?v=48" defer></script>
+    <script src="app-export.js?v=48" defer></script>
+    <script src="app.js?v=48" defer></script>
   </body>
 </html>

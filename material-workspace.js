@@ -52,8 +52,12 @@
         return;
       }
       const available = source.length || e.sourceText.value.trim();
-      e.processButton.textContent = busy ? "Обрабатываю документ…" : modelJob && modelJob.cursor < modelJob.jobs.length ? "Продолжить редактуру" : "Обработать и собрать документ";
+      e.processButton.textContent = busy ? "Обрабатываю документ…" : "Обработать и собрать документ";
       e.processButton.disabled = !available || busy || pendingPaste || options.otherBusy();
+      const polishButton = document.getElementById("polishButton");
+      const modelComplete = modelJob && modelJob.cursor === modelJob.jobs.length;
+      polishButton.disabled = !processed || busy || pendingPaste || options.otherBusy() || !root.Generator.supported() || Boolean(modelComplete);
+      polishButton.textContent = modelComplete ? "Обработка моделью завершена" : modelJob ? "Продолжить обработку моделью" : "Дополнительно обработать моделью";
       e.clearButton.disabled = !available && !busy;
       e.sourceTitle.textContent = "Работа целиком из буфера";
       e.sourceText.placeholder = "Вставьте работу целиком";
@@ -150,7 +154,7 @@
         } catch (error) { report(error.message, true); }
       });
     }
-    async function run() {
+    async function run({ withModel = false } = {}) {
       if (!active() || busy || pendingPaste || options.otherBusy()) return;
       if (!source.length) {
         contentRevision++;
@@ -176,6 +180,11 @@
           save();
         }
         assemble(processed);
+        if (!withModel) {
+          showChoices();
+          report(`Документ собран: изменено абзацев ${changed}. Модель не запускалась. ${notes.join(" ")}`);
+          return;
+        }
         if (!root.Generator.supported()) { report(`Документ собран: изменено абзацев ${changed}. WebGPU недоступен — выполнена базовая обработка. ${notes.join(" ")}`); return; }
         if (!modelJob) modelJob = { ...root.MaterialProcessing.jobs(processed), base: processed, cursor: 0, details: [] };
         for (; modelJob.cursor < modelJob.jobs.length;) {
@@ -186,7 +195,7 @@
           await root.PolishUI.run({ text: piece.text, language: root.RuleParaphraser.detectLanguage(piece.text), isCurrent: current,
             collect: (value) => { result = value; }, report: (message, error) => report(progress + message, error) });
           if (!current()) return;
-          if (!result) { report(progress + "Порция не завершена. Нажмите «Продолжить редактуру» или скачайте базовый DOCX.", true); break; }
+          if (!result) { report(progress + "Порция не завершена. Нажмите «Продолжить обработку моделью» или скачайте текущий DOCX.", true); break; }
           const rankingWarning = /недоступна|пропущено/u.test(result.rankingSummary || "") ? [result.rankingSummary] : [];
           notes = [...new Set([...notes, ...(result.generatorWarnings || []), ...(result.warnings || []), ...rankingWarning])];
           const nextDetails = [...job.details, ...result.details.map((detail) => ({ ...detail, start: detail.start + piece.offset, end: detail.end + piece.offset }))];

@@ -34,7 +34,7 @@
     } else {
       parts.push("Безопасные словарные правки: подходящих замен не найдено.");
     }
-    parts.push(root.HumanizerEngine.describeRounds(humanized));
+    parts.push(`Ритм и шаблонные обороты: ${root.HumanizerEngine.describeRounds(humanized)}`);
     // Предупреждение отвязано от цели цикла. Цель — медиана живого корпуса,
     // и не дойти до неё нормально: три четверти живых текстов до неё тоже не
     // доходят. Тревожит не это, а оставшаяся заметная машинность, то есть
@@ -46,7 +46,7 @@
       parts.push(
         `Оценка ${humanized.after.score} осталась выше типичной для живого текста (${quiet}): ` +
           "для оставшихся признаков нет замены, которая гарантированно не сломает грамматику, — " +
-          "их нужно править вручную.",
+          "исходный смысл сохранён без неподтверждённых замен.",
       );
     }
     const cleaning = changeSummary(cleaningStats);
@@ -129,7 +129,9 @@
     // финальные знаки и сам решает, какие из них разворачивать в предложение
     // или в скобки, а какие оставить: тире, которое он оставил, остаётся
     // осознанным решением, а не следствием порядка вызовов.
-    const typography = root.Typography.normalize(denominalized.text);
+    const grammar = root.GrammarEdits || (typeof require === "function" ? require("./grammar-edits.js") : null);
+    const revised = grammar ? grammar.run(denominalized.text) : denominalized;
+    const typography = root.Typography.normalize(revised.text);
     const loose = looseNeeded(typography.text);
     const humanized = root.HumanizerEngine.humanize(typography.text, {
       language: paraphrased.language,
@@ -162,10 +164,14 @@
       guardWarnings.push("Замены, затрагивающие ссылки, отменены. Ссылки сохранены как в исходнике.");
     }
 
+    const summaryParts = termsChanged ? ["Защищённые термины сохранены; базовые замены не применены."] : summary(outcome.stats, paraphrased, humanized, typography.stats);
+    const grammarApplied = !regressed && !termsChanged && finalText !== outcome.text
+      ? (revised.edits || []).filter(edit => finalText.includes(edit.replacement)).length : 0;
+    if (grammarApplied) summaryParts.unshift(`Грамматика: автоматически исправлено ${grammarApplied} ${pluralForm(grammarApplied, "оборот", "оборота", "оборотов")} с согласованием слов.`);
     return {
       text: finalText,
       language: humanized.language,
-      summary: termsChanged ? ["Защищённые термины сохранены; базовые замены не применены."] : summary(outcome.stats, paraphrased, humanized, typography.stats),
+      summary: summaryParts,
       terms,
       metricsBefore: root.HumanizerMetrics.scoreText(outcome.text, paraphrased.language),
       warnings: [...outcome.warnings, ...paraphrased.warnings, ...humanized.warnings, ...guardWarnings],
