@@ -1,6 +1,28 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const errors = require('./model-errors.js');
+for (const [message, category] of [
+  ['Failed to fetch https://example.test/Qwen-webgpu.wasm', 'network'],
+  ['HTTP 404 https://example.test/webgpu.wasm', 'access'],
+  ['WebGPU initialization timed out', 'timeout'],
+  ['Cannot allocate buffer on GPUDevice', 'memory'],
+  ['Unknown error https://example.test/adapter-webgpu.wasm', 'unknown'],
+]) test(`resource names do not override the concrete cause: ${message}`, () => {
+  assert.equal(errors.explain(message).category, category);
+});
+test('diagnostic preserves a bounded runtime error, not URL credentials or tokens', () => {
+  const event = errors.event(Error('Failed to fetch https://user:pass@example.test/webgpu.wasm?token=secret#private Bearer verysecret'), {stage:'Загрузка'});
+  assert.equal(event.diagnostic.category, 'network'); assert.equal(event.diagnostic.stage, 'Загрузка');
+  assert.match(event.diagnostic.technical, /Failed to fetch https:\/\/example.test\/webgpu.wasm/);
+  assert.doesNotMatch(event.diagnostic.technical, /user|pass|token|secret|private/);
+  assert.ok(errors.event('x'.repeat(10000)).diagnostic.technical.length <= 1200);
+});
+test('unknown error redaction applies to every displayed field, not just technical details', () => {
+  const raw='Unexpected condition https://user:pass@example.test/runtime?token=secret#private Bearer verysecret';
+  const event=errors.event(Error(raw)); assert.equal(event.diagnostic.category,'unknown');
+  assert.doesNotMatch(JSON.stringify(event),/user:|pass@|token=|secret|private/);
+  assert.doesNotMatch(errors.explain(raw).message,/user:|pass@|token=|secret|private/);
+});
 for (const [message, category] of [['Failed to fetch', 'network'], ['HTTP 503', 'network'],
   ['HTTP 404 Not Found', 'access'], ['QuotaExceededError', 'storage'], ['out of memory', 'memory'],
   ['GPU device lost', 'gpu'], ['WebGPU недоступен', 'gpu'], ['timeout', 'timeout'], ['Unknown failure', 'unknown']]) {

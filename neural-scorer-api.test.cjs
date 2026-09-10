@@ -47,6 +47,17 @@ test("batch limit rejects before creating a worker",async()=>{
   const {api,workers}=setup();await assert.rejects(api.scoreDetails(Array(33).fill("x")),/много/);
   assert.equal(workers.length,0);
 });
+test('late events from a cancelled scorer cannot overwrite status or kill its replacement',async()=>{
+  const {api,workers,elements}=setup();api.lockForPolish();
+  const first=api.scoreDetails(['first']);api.cancelPolishScoring();await assert.rejects(first);
+  const retry=api.scoreDetails(['retry']);api.reportProgress({message:'New run'});
+  workers[0].reply({type:'progress',message:'Late ready',done:true});
+  workers[0].reply({type:'ready',message:'Late ready'});
+  workers[0].listeners.error({message:'Late fatal error'});
+  assert.equal(elements.get('#neuralStatus').textContent,'New run');
+  assert.notEqual(workers[1].terminated,true);
+  workers[1].reply({type:'scores',scores:[]});await retry;
+});
 test("visible progress clamps percentages, clears unknown values and retains completion text",()=>{
   const {api,elements}=setup();api.reportProgress({message:"Download",progress:150});
   assert.equal(elements.get("#modelLoadStatus").hidden,false);

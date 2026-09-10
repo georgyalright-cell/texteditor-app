@@ -1,6 +1,20 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { create } = require('./model-run-status.js');
+const errors = require('./model-errors.js');
+test('original failure survives translated and generic messages; retry clears it', async () => {
+  const f = fixture(); await f.status.track(async () => {
+    f.status.progress(errors.event(Error('Failed to fetch https://example.test/webgpu.wasm'), {stage:'Подготовка генератора'}));
+    f.status.progress({isError:true,message:'Текущая порция не завершена.'});
+    return {completed:false};
+  });
+  assert.equal(f.state().diagnostic.category,'network');
+  assert.match(f.state().diagnostic.technical,/Failed to fetch/);
+  assert.equal(f.state().diagnostic.stage,'Подготовка генератора');
+  assert.match(f.state().detail,/Проверьте сеть/);
+  await f.status.track(async()=>({completed:true,modelUsed:true}));
+  assert.equal(f.state().phase,'done'); assert.equal(f.state().diagnostic,null);
+});
 function fixture() {
   let state, time = 0, tick, stopped = 0;
   const status = create({ render: value => { state = value; }, now: () => time,

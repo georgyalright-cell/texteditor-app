@@ -1,10 +1,10 @@
 "use strict";
 
-import "./author-style.js?v=52";
-import "./business-english.js?v=52";
-import "./generator-core.js?v=52";
-import "./meaning-guard.js?v=52";
-import "./model-progress.js?v=52";
+import "./author-style.js?v=53";
+import "./business-english.js?v=53";
+import "./generator-core.js?v=53";
+import "./meaning-guard.js?v=53";
+import "./model-progress.js?v=53";
 import { CreateMLCEngine } from "./vendor/webllm/web-llm.mjs";
 
 const GENERATOR_MODEL = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
@@ -81,12 +81,14 @@ async function loadGenerator() {
 }
 
 async function paraphrase(request) {
+  let runtimeStage = "Подготовка генератора: загрузка файлов и запуск WebGPU";
   try {
     const sentence = String(request.sentence || "").trim();
     if (!sentence) throw new Error("Предложение для перефразирования пусто.");
     if (sentence.length > 1800) throw new Error("Предложение слишком длинное для локальной редакции.");
     const count = self.GeneratorCore.variantCount(request.count);
     const localEngine = await loadGenerator();
+    runtimeStage = "Генератор: перефразирование предложения";
     const position = Number(request.position);
     const total = Number(request.total);
     const stage = Number.isFinite(position) && Number.isFinite(total)
@@ -125,6 +127,7 @@ async function paraphrase(request) {
   } catch (error) {
     send("error", {
       id: request.id,
+      stage: runtimeStage,
       message: error instanceof Error ? error.message : "Локальный генератор не выполнил запрос.",
     });
   }

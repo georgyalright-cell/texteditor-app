@@ -124,6 +124,24 @@ test("без WebGPU генератор отказывает, не создава
   const api = create({ navigator: {}, Worker: class UnexpectedWorker {} });
   await assert.rejects(api.paraphrase("Текст."), /WebGPU недоступен/);
 });
+test('stale generator events cannot break a resumed worker; failed release cannot throw', async () => {
+  const workers=[],progress=[];
+  class Worker {
+    constructor(){this.listeners={};workers.push(this);}
+    addEventListener(type,fn){this.listeners[type]=fn;}
+    terminate(){this.terminated=true;}
+    postMessage(message){if(message.type==='release')throw Error('Worker unavailable');this.request=message;}
+  }
+  const api=create({navigator:{gpu:{}},Worker,NeuralScorerUI:{reportProgress:e=>progress.push(e)}});
+  const first=api.paraphrase('First.'); api.cancel(); await assert.rejects(first,/остановлена/);
+  const second=api.paraphrase('Second.');
+  workers[0].listeners.error({message:'Late fatal error'});
+  workers[0].listeners.message({data:{type:'progress',message:'Late progress'}});
+  assert.equal(progress.length,0);
+  workers[1].listeners.message({data:{type:'variants',id:workers[1].request.id,variants:['Revised.']}});
+  assert.deepEqual(await second,['Revised.']);
+  assert.doesNotThrow(()=>api.release()); assert.equal(workers[1].terminated,true);
+});
 
 test('generator retries a transient worker download failure once and not after cancel', async () => {
   for (const cancelled of [false, true]) {
@@ -165,5 +183,5 @@ test("глубокая редакция добавляет только конт
   assert.match(workerSource, /SAMPLING_TOP_P = 0\.92/u);
   assert.match(workerSource, /seed: samplingSeed\(request\.id\)/u);
   assert.doesNotMatch(workerSource, /seed:\s*20260903/u);
-  assert.match(generatorSource, /generator-worker\.js\?v=52/u);
+  assert.match(generatorSource, /generator-worker\.js\?v=53/u);
 });

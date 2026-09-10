@@ -113,8 +113,10 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker("neural-worker.js?v=52");
+    worker = new Worker("neural-worker.js?v=53");
+    const instance = worker;
     worker.addEventListener("message", (event) => {
+      if (worker !== instance) return;
       const message = event.data || {};
       if (message.type === "progress") {
         reportProgress(message);
@@ -153,6 +155,7 @@
       if (message.type === "result" || message.type === "error") setBusy(false);
     });
     worker.addEventListener("error", (event) => {
+      if (worker !== instance) return;
       if (worker) worker.terminate();
       worker = null; modelsWarm = false;
       for (const waiting of pending.values()) {
@@ -214,7 +217,7 @@
     const id = selectionId;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        const error = new Error("Истекло время нейрооценки.");
+        const error = new Error("Истекло время нейрооценки (timeout).");
         if (worker) worker.terminate(); worker = null; modelsWarm = false;
         for (const waiting of pending.values()) waiting.reject(error);
         pending.clear();

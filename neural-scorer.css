@@ -135,6 +135,9 @@
   background: #f5f8ff;
 }
 .model-run-status p { margin: 6px 0 0; font-size: 13px; }
+.model-run-status details { margin-top: 10px; font-size: 13px; }
+.model-run-status summary { cursor: pointer; }
+.model-run-status pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; font-size: 12px; user-select: text; }
 .model-run-status[data-phase="done"] { border-left-color: #23784e; background: #edf8f1; }
 .model-run-status[data-phase="error"],
 .model-run-status[data-phase="partial"] { border-left-color: #ae6a16; background: #fff7e9; }

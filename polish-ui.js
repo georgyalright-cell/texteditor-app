@@ -51,11 +51,13 @@
       if (!current()) return;
       if (!result.ok) { options.report(result.warnings.join(" "), true); return; }
       const warnings = (result.generatorWarnings || []).join(". ");
-      complete = true;
+      complete = !warnings && !(result.warnings || []).length && !ranker.failed();
       result.modelUsed = modelUsed;
       result.modelLimited = Boolean(warnings) || Boolean(result.warnings && result.warnings.length) || ranker.limited();
       result.rankingFailed = ranker.failed();
       for (const detail of result.details) detail.neural = ranker.pair(detail.before, detail.after);
+      if (!complete && engine && root.ModelErrors) engine.reportProgress(root.ModelErrors.event(
+        warnings || (result.warnings || []).join(" ") || ranker.summary(), { stage: "Проверка порции", offline: root.navigator?.onLine === false }));
       if (options.collect) { result.rankingSummary = ranker.summary(); options.collect(result); return; }
       if (!result.replaced) {
         options.report(`Подходящих вариантов не найдено. Текущий текст сохранён. ${ranker.summary()}${warnings ? ` ${warnings}` : " Менять удачную формулировку необязательно."}`, Boolean(warnings));
@@ -64,15 +66,26 @@
       const applied = root.AutomaticRevision.apply(options.text, result.details);
       if (current()) options.apply(applied);
       options.report(`Проверенные формулировки применены. ${ranker.summary()}${warnings ? ` ${warnings}` : ""}`, Boolean(warnings));
-    } catch (error) { if (current()) options.report(error.message || "Редактура недоступна.", true); }
+    } catch (error) {
+      complete = false;
+      if (current()) {
+        options.report(error.message || "Редактура недоступна.", true);
+        if (engine && root.ModelErrors) engine.reportProgress(root.ModelErrors.event(error, { stage: "Обработка порции", offline: root.navigator?.onLine === false }));
+      }
+    }
     finally {
       clearTimeout(timer);
       if (operation !== sequence && options.isCurrent()) options.report("Редактура остановлена. Текущий текст сохранён.");
-      if (root.Generator) root.Generator.release();
+      if (!complete) {
+        // A failed device/runtime must not be reused when resuming this batch.
+        if (root.Generator) root.Generator.cancel();
+        if (root.SemanticScorer) root.SemanticScorer.cancel();
+        if (engine && engine.cancelPolishScoring) engine.cancelPolishScoring();
+      } else if (root.Generator) root.Generator.release();
       if (options.isCurrent() && engine && engine.reportProgress) engine.reportProgress({ done: true,
         message: timedOut ? "Время ожидания истекло. Полный проход не выполнен." : operation !== sequence
           ? "Редактура остановлена. Текущий текст сохранён." : complete
-            ? "Текущая порция обработана. Общий итог — в индикаторе модельной обработки."
+            ? options.collect ? "Порция передана на проверку и сохранение. Дождитесь общего итога." : "Текущая порция обработана. Общий итог — в индикаторе модельной обработки."
             : "Текущая порция не завершена. Текущий текст сохранён.", isError: !complete && operation === sequence || timedOut });
       if (engine && engine.unlockAfterPolish) engine.unlockAfterPolish();
       active = false;

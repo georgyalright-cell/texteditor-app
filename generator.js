@@ -28,8 +28,10 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new root.Worker("generator-worker.js?v=52", { type: "module" });
+    worker = new root.Worker("generator-worker.js?v=53", { type: "module" });
+    const instance = worker;
     worker.addEventListener("message", (event) => {
+      if (worker !== instance) return;
       const message = event.data || {};
       if (message.type === "progress") {
         report(message);
@@ -39,9 +41,10 @@
       const waiting = pending.get(message.id);
       pending.delete(message.id);
       if (message.type === "variants") waiting.resolve(Array.isArray(message.variants) ? message.variants : []);
-      else waiting.reject(new Error(message.message || "Локальный генератор не выполнил запрос."));
+      else waiting.reject(Object.assign(new Error(message.message || "Локальный генератор не выполнил запрос."), { stage: message.stage }));
     });
     worker.addEventListener("error", (event) => {
+      if (worker !== instance) return;
       const error = new Error(event.message || "Ошибка локального генератора.");
       rejectPending(error);
       report({ message: `Генератор недоступен: ${error.message}. Продолжаю со словарными версиями.`, isError: true });
@@ -52,7 +55,10 @@
   }
 
   function release() {
-    if (worker && !pending.size) worker.postMessage({ type: "release" });
+    if (worker && !pending.size) {
+      try { worker.postMessage({ type: "release" }); }
+      catch { cancel(); } // A dead worker must not leave the UI locked in finally.
+    }
   }
 
   function cancel() {
@@ -91,7 +97,8 @@
     const result = errors ? errors.retryOnce(request, { offline: () => root.navigator.onLine === false,
       isCurrent: () => operation === generation, report: message => report({ message }) }) : request();
     return result.catch((error) => {
-      if (error.message !== "Редактура остановлена.") report({ message: errors ? errors.explain(error, { offline: root.navigator.onLine === false }).message : `Генератор недоступен: ${error.message}. Продолжаю со словарными версиями.`, isError: true });
+      if (error.message !== "Редактура остановлена.") report(errors ? errors.event(error,
+        { stage: error.stage || "Генератор", offline: root.navigator.onLine === false }) : { message: `Генератор недоступен: ${error.message}. Продолжаю со словарными версиями.`, isError: true });
       throw error;
     });
   }

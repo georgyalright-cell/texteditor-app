@@ -1,9 +1,9 @@
 "use strict";
 
-importScripts("./neural-scorer-core.js?v=52");
-importScripts("./model-progress.js?v=52");
+importScripts("./neural-scorer-core.js?v=53");
+importScripts("./model-progress.js?v=53");
 
-const TRANSFORMERS_URL = "./vendor/transformers/transformers.web.min.mjs?v=52";
+const TRANSFORMERS_URL = "./vendor/transformers/transformers.web.min.mjs?v=53";
 const OBSERVER_MODEL = "onnx-community/Qwen2.5-0.5B-ONNX";
 const OBSERVER_REVISION = "edb2f22b84411a7990bd63bf64c6a471fbd13ecc";
 const PERFORMER_MODEL = "onnx-community/Qwen2.5-0.5B-Instruct-ONNX";
