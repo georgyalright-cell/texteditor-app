@@ -15,6 +15,9 @@
       if (!saved.details.every(d => job.jobs.slice(0, saved.cursor).some(p => d.start >= p.offset && d.end <= p.offset + p.text.length))) return null;
       const output = root.MaterialProcessing.apply(job.base, saved.details);
       if (JSON.stringify(output) !== JSON.stringify(processed)) return null;
+      const before = root.MaterialProcessing.textMap(job.base).text, after = root.MaterialProcessing.textMap(output).text;
+      const guard = root.AnchorGuard || (typeof require === "function" ? require("./anchor-guard.js") : null);
+      if (before !== after && (!guard || !guard.compare(before, after).ok)) return null;
       return Object.assign(job, { cursor: saved.cursor, details: saved.details, limited: Boolean(saved.limited),
         modelUsed: Boolean(saved.modelUsed), reasons: Array.isArray(saved.reasons) ? saved.reasons.filter(s => typeof s === "string") : [] });
     } catch { return null; }

@@ -210,8 +210,11 @@
           job.modelUsed ||= result.modelUsed !== false;
           job.reasons.push(...(result.generatorWarnings || []), ...(result.warnings || []), ...rankingWarning);
           notes = [...new Set([...notes, ...(result.generatorWarnings || []), ...(result.warnings || []), ...rankingWarning])];
-          const nextDetails = [...job.details, ...result.details.map((detail) => ({ ...detail, start: detail.start + piece.offset, end: detail.end + piece.offset }))];
-          processed = root.MaterialProcessing.apply(job.base, nextDetails);
+          const selected = root.MaterialProcessing.accept(job.base, job.details,
+            result.details.map((detail) => ({ ...detail, start: detail.start + piece.offset, end: detail.end + piece.offset })));
+          if (selected.rejected || (result.integrityNotes || []).length) notes = [...new Set([...notes, root.MaterialProcessing.INTEGRITY_NOTE])];
+          const nextDetails = selected.details;
+          processed = selected.blocks;
           job.details = nextDetails;
           if (nextDetails.length) modelUndo = { blocks: job.base, details: nextDetails };
           job.cursor++;
@@ -250,6 +253,7 @@
       }
       if (active()) { display(); showChoices(); } summary();
       if (modelJob) report(root.ModelCheckpoint.progress(modelJob) + " Прогресс восстановлен. Модель запустится только по кнопке.");
+      else if (draft.modelJob) report("Прежняя очередь не прошла проверку совместимости. Последний обработанный документ сохранён; следующий запуск модели начнёт новый проход. Предыдущую редактуру можно отменить в сравнении.");
     }).catch(() => report("Сохранённый черновик недоступен. Можно вставить материал заново.", true));
     return {
       ready, active, controls, run, cancel, busy: () => busy,

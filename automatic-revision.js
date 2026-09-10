@@ -54,7 +54,10 @@
       job.modelUsed ||= result.modelUsed !== false;
       for (const warning of [...(result.generatorWarnings || []), ...(result.warnings || [])]) warnings.add(warning);
       if (result.rankingSummary) warnings.add(result.rankingSummary);
-      const next = [...job.details, ...result.details.map((d) => ({ ...d, start: d.start + piece.offset, end: d.end + piece.offset }))];
+      const selected = root.MaterialProcessing.accept(job.base, job.details,
+        result.details.map((d) => ({ ...d, start: d.start + piece.offset, end: d.end + piece.offset })));
+      if (selected.rejected || (result.integrityNotes || []).length) warnings.add(root.MaterialProcessing.INTEGRITY_NOTE);
+      const next = selected.details;
       latest = apply(source, next);
       latest.warnings = [...warnings];
       job.details = next; job.cursor++; job.reasons = [...warnings];

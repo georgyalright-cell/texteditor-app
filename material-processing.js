@@ -1,5 +1,7 @@
 (function attach(root) {
   "use strict";
+  const guard = () => root.AnchorGuard || require("./anchor-guard.js");
+  const INTEGRITY_NOTE = "Некоторые формулировки оставлены исходными: проверка в общем тексте защитила ссылки, числа и даты. Обработка продолжена.";
   function textMap(blocks) {
     let text = ""; const ranges = [];
     const protectedBlocks = root.ReferenceGuard ? root.ReferenceGuard.protectedBlocks(blocks) : [];
@@ -34,10 +36,30 @@
       const range = mapping.ranges.find((r) => detail.start >= r.start && detail.end <= r.end);
       if (!range || detail.end > previousStart || detail.start >= detail.end) throw new Error("Замена пересекает границу блока. Запустите обработку заново.");
       const block = result[range.index], start = detail.start - range.start, end = detail.end - range.start;
-      if (block.text.slice(start, end).trim() !== detail.before || !root.AnchorGuard.compare(detail.before, detail.after).ok) throw new Error("Исходный текст или числовые данные изменились. Замена не применена.");
+      if (block.text.slice(start, end).trim() !== detail.before || !guard().compare(detail.before, detail.after).ok) throw new Error("Исходный текст или числовые данные изменились. Замена не применена.");
       block.text = block.text.slice(0, start) + detail.after + block.text.slice(end); previousStart = detail.start;
     }
     return result;
+  }
+  // Keep the global guard. An otherwise admissible sentence can change anchor
+  // recognition at a batch boundary. Reject that proposal, not the whole job.
+  function accept(blocks, previous, proposals) {
+    const source = textMap(blocks).text;
+    const valid = result => { const text = textMap(result).text; return source === text || guard().compare(source, text).ok; };
+    let details = previous.slice(), output = apply(blocks, details), rejected = 0;
+    if (!valid(output)) throw new Error("Сохранённые правки не прошли проверку ссылок и чисел. Исходный текст не изменён.");
+    try {
+      const all = apply(blocks, [...details, ...proposals]);
+      if (valid(all)) return { blocks: all, details: [...details, ...proposals], rejected: 0 };
+    } catch (_) { /* Resolve failed proposals individually below. */ }
+    for (const proposal of proposals) {
+      try {
+        const next = apply(blocks, [...details, proposal]);
+        if (valid(next)) { details.push(proposal); output = next; }
+        else rejected++;
+      } catch (_) { rejected++; }
+    }
+    return { blocks: output, details, rejected };
   }
   async function base(blocks, options) {
     const result = structuredClone(blocks), warnings = new Set(); let changed = 0;
@@ -59,7 +81,7 @@
     }
     return options.isCurrent() ? { blocks: result, changed, warnings: [...warnings] } : null;
   }
-  const api = { textMap, jobs, apply, base };
+  const api = { textMap, jobs, apply, accept, base, INTEGRITY_NOTE };
   if (typeof module === "object" && module.exports) module.exports = api;
   root.MaterialProcessing = api;
 })(typeof window === "object" ? window : globalThis);

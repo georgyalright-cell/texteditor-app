@@ -514,25 +514,21 @@
       // Гард на весь документ: замены проверялись по одному предложению, но
       // потерять якорь можно и на склейке.
       const check = guard ? guard.compare(source, result) : { ok: true };
+      const integrityNotes = [];
       if (!check.ok) {
-        return {
-          text: source,
-          replaced: 0,
-          targeted: targets.length,
-          totalSentences,
-          changedWordShare: 0,
-          generatorWarnings,
-          details: [],
-          ok: false,
-          warnings: [`Полировка отменена целиком: ${guard.describe(check)}.`],
-        };
+        const processing = globalThis.MaterialProcessing || (typeof require === "function" ? require("./material-processing.js") : null);
+        if (!processing) throw new Error("Модуль проверки формулировок не загрузился. Сохраните текст и обновите страницу.");
+        const selected = processing.accept([{ type: "paragraph", text: source }], [], details);
+        result = selected.blocks[0].text;
+        details.splice(0, details.length, ...selected.details);
+        integrityNotes.push(processing.INTEGRITY_NOTE);
       }
       const changedWords = details.reduce((sum, detail) => sum + wordTokens(detail.before, settings.language).length, 0);
       const totalWords = wordTokens(source, settings.language).length;
       return {
         source,
         text: result,
-        replaced: replacements.length,
+        replaced: details.length,
         targeted: targets.length,
         totalSentences,
         changedWordShare: totalWords ? changedWords / totalWords : 0,
@@ -540,6 +536,7 @@
         details,
         ok: true,
         warnings: [],
+        integrityNotes,
       };
     });
   }

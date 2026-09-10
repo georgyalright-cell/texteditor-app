@@ -7,6 +7,7 @@
   function explain(error, { offline = false } = {}) {
     const raw = String(error && error.message || error || "");
     const text = `${error && error.name || ""} ${raw}`;
+    if (/Замены отменены: изменились ссылки|Сохранённые правки не прошли проверку|Исходный текст или числовые данные изменились/iu.test(text)) return { category: "integrity", message: "Проверка сохранности ссылок, чисел или дат отклонила замену. Исходные данные сохранены. Это не ошибка интернета. Скачайте текущий результат; если сообщение повторяется, передайте пример для проверки.", retryable: false };
     if (/остановлен|cancelled|aborted/iu.test(text)) return { category: "cancelled", message: "Обработка остановлена. Текущий текст сохранён.", retryable: false };
     if (/QuotaExceeded|quota|disk.?full|не хватает.*места/iu.test(text)) return { category: "storage", message: "Не удалось сохранить файлы модели: не хватает места или превышена квота браузера. Освободите место и повторите запуск. Черновики автоматически не удаляются.", retryable: false };
     if (/out.of.memory|allocation.failed|allocate.*(?:buffer|memory)|insufficient.*memory|недостаточно.*памяти|не хватило памяти/iu.test(text)) return { category: "memory", message: "Для модели не хватило памяти. Закройте тяжёлые вкладки и приложения, затем повторите запуск. Обычная обработка доступна без модели.", retryable: false };

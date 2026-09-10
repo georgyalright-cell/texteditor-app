@@ -32,6 +32,7 @@ function fixture({ supported = true, interrupt = false } = {}) {
       base: async b => { calls.push('base'); return { blocks: b, changed: 1, warnings: [] }; },
       jobs: b => { calls.push('jobs'); return { jobs: [{ text: b[0].text, offset: 0 }] }; },
       apply: b => b,
+      accept: (b, previous, proposals) => ({ blocks: b, details: [...previous, ...proposals], rejected: 0 }),
     },
     PolishUI: { cancel() {}, async run({ collect }) {
       calls.push('model');
