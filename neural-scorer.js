@@ -19,7 +19,7 @@
   let lockedForPolish = false;
 
   function supported() {
-    return Boolean(root.navigator && root.navigator.gpu && root.Worker);
+    return Boolean(root.navigator && root.navigator.gpu && root.Worker && (!root.GpuSupport || root.GpuSupport.ready()));
   }
 
   function setStatus(message, isError) {
@@ -113,7 +113,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker("neural-worker.js?v=54");
+    worker = new Worker("neural-worker.js?v=55");
     const instance = worker;
     let lastProgress = "";
     worker.addEventListener("message", (event) => {
@@ -183,7 +183,9 @@
     if (!busy && !lockedForPolish) elements.loadStatus.hidden = true;
     if (!texts.result) return;
     if (!supported()) {
-      reportProgress({done:true,isError:true,message:"WebGPU недоступен. Обычная обработка продолжает работать без нейромоделей."});
+      // Availability has its own live notice; it is not a failed model run.
+      if (root.GpuSupport) elements.loadStatus.hidden = true;
+      else reportProgress({done:true,isError:true,message:"WebGPU недоступен. Обычная обработка продолжает работать без нейромоделей."});
     } else {
       setStatus(
         "Оценка при первом запуске загрузит около 1 ГБ. Генератор формулировок — ещё около 880 МБ только при его запуске.",
@@ -236,6 +238,7 @@
     });
   }
 
+  root.GpuSupport?.subscribe(() => setBusy(busy));
   root.NeuralScorerUI = {
     setTexts,
     supported,

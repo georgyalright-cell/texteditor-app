@@ -1,10 +1,11 @@
 "use strict";
 
-import "./author-style.js?v=54";
-import "./business-english.js?v=54";
-import "./generator-core.js?v=54";
-import "./meaning-guard.js?v=54";
-import "./model-progress.js?v=54";
+import "./author-style.js?v=55";
+import "./business-english.js?v=55";
+import "./generator-core.js?v=55";
+import "./meaning-guard.js?v=55";
+import "./model-progress.js?v=55";
+import "./gpu-support.js?v=55";
 import { CreateMLCEngine } from "./vendor/webllm/web-llm.mjs";
 
 const GENERATOR_MODEL = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
@@ -60,13 +61,8 @@ async function loadGenerator() {
   if (loading) return loading;
   loading = (async () => {
     // Match the minimum limits of the pinned WebLLM runtime before downloading weights.
-    const adapter = self.navigator?.gpu && await self.navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
-    if (!adapter) throw new Error("WebGPU: браузер не предоставил совместимый видеоускоритель. Файлы модели не загружались.");
-    if (!adapter.features.has("shader-f16")) throw new Error("WebGPU: для этой модели нужен shader-f16. Файлы модели не загружались.");
-    for (const [name, required] of Object.entries({ maxBufferSize: 268435456, maxStorageBufferBindingSize: 134217728,
-      maxComputeWorkgroupStorageSize: 32768, maxStorageBuffersPerShaderStage: 10 })) {
-      if (!(adapter.limits[name] >= required)) throw new Error(`WebGPU: недостаточный лимит ${name}: ${adapter.limits[name]}, требуется ${required}. Файлы модели не загружались.`);
-    }
+    const support = await self.GpuSupport.probe();
+    if (support.status !== "ready") throw new Error(`WebGPU: ${support.message} Файлы модели не загружались.`);
     send("progress", {
       progress: null,
       message: "Генератор · Qwen2.5 1.5B · проверяю кэш и подключаю модель. Первая загрузка — около 880 МБ…",

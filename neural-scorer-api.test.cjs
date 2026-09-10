@@ -83,3 +83,10 @@ test("unsupported WebGPU reason stays visible beside disabled model actions",()=
   assert.match(elements.get("#neuralStatus").textContent,/WebGPU недоступен/);
   assert.equal(elements.get("#neuralProgress").hidden,true);
 });
+test('availability checking uses its own notice, not a fake failed model progress panel',async()=>{
+  const {api,elements,ctx,workers}=setup();
+  ctx.GpuSupport={ready:()=>false,snapshot:()=>({status:'checking',message:'Checking'})};
+  api.setTexts('source','result');assert.equal(elements.get('#modelLoadStatus').hidden,true);
+  assert.equal(elements.get('#neuralScoreButton').disabled,true);
+  await assert.rejects(api.scoreDetails(['source']),/WebGPU/);assert.equal(workers.length,0);
+});

@@ -51,6 +51,7 @@ test('generator worker reports actual load vs inference stage and can run again'
     addEventListener:(k,f)=>listeners[k]=f,ModelProgress:{generator:r=>r},
     GeneratorCore:{variantCount:()=>1,generationPlan:()=>[{}],buildMessages:()=>[],outputBudget:()=>160,
       completedChoices:()=>['Revised.'],parseVariants:r=>r}}};
+  context.self.GpuSupport=require('./gpu-support.js').create(context.self);
   vm.createContext(context);
   vm.runInContext(source('./generator-worker.js').replace(/^import .*;\n/gm,''),context);
   const run=async id=>{listeners.message({data:{type:'paraphrase',id,sentence:'Source.'}});await vm.runInContext('queue',context);return messages.at(-1);};
@@ -97,6 +98,7 @@ for (const unsupported of ['adapter','shader-f16','maxBufferSize','maxStorageBuf
       navigator:{gpu:{requestAdapter:async()=>unsupported==='adapter'?null:adapter}},
       location:{href:'https://example.test/generator-worker.js'},postMessage:m=>messages.push(m),
       addEventListener:(type,fn)=>listeners[type]=fn,GeneratorCore:{variantCount:()=>1}}};
+    context.self.GpuSupport=require('./gpu-support.js').create(context.self);
     vm.createContext(context);vm.runInContext(source('./generator-worker.js').replace(/^import .*;\n/gm,''),context);
     listeners.message({data:{type:'paraphrase',id:1,sentence:'Source.'}});await vm.runInContext('queue',context);
     assert.equal(loads,0);assert.equal(messages.at(-1).type,'error');

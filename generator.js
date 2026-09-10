@@ -12,7 +12,7 @@
   let generation = 0;
 
   function supported() {
-    return Boolean(root.navigator && root.navigator.gpu && root.Worker);
+    return Boolean(root.navigator && root.navigator.gpu && root.Worker && (!root.GpuSupport || root.GpuSupport.ready()));
   }
 
   function report(message) {
@@ -28,7 +28,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new root.Worker("generator-worker.js?v=54", { type: "module" });
+    worker = new root.Worker("generator-worker.js?v=55", { type: "module" });
     const instance = worker;
     worker.addEventListener("message", (event) => {
       if (worker !== instance) return;

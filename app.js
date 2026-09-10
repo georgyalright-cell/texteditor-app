@@ -688,4 +688,5 @@
   renderProject();
   setMode("fragment");
   material.ready.then(() => window.ReviewUI.recover());
+  window.addEventListener("gpu-support-change", updateControls);
 })();

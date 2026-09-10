@@ -24,6 +24,7 @@
     }
     if (/timeout|timed.out|время ожидания|не отвечает/iu.test(text)) return { category: "timeout", message: "Модель не ответила за отведённое время. Это может быть медленная загрузка или подготовка WebGPU, не обязательно интернет. Текст сохранён; можно повторить запуск.", retryable: false };
     // A URL such as Qwen-webgpu.wasm is a resource name, not evidence of GPU failure.
+    if (/не предоставил.*видеоускоритель|unable to find a compatible GPU/iu.test(text)) return { category: "gpu", message: "Браузер не предоставил видеоускоритель. Проверьте Настройки → Система → аппаратное ускорение графики и перезапустите браузер. Если ускорение уже включено, проверьте совместимость браузера и GPU. Документ сохранён; это не ошибка таблиц.", retryable: false };
     if (/device.*lost|GPUDevice|WebGPU|adapter|shader|GPU.*(?:error|lost)/iu.test(text.replace(/https?:\/\/\S+/giu, ""))) return { category: "gpu", message: "Не удалось запустить или удержать WebGPU. Сохраните результат, перезапустите браузер с поддержкой WebGPU и повторите. Обычная обработка работает без модели.", retryable: false };
     return { category: "unknown", message: `Точная причина не определена.${raw ? ` Сообщение: ${safeMessage(raw).slice(0, 220)}` : " Модель не вернула завершённый результат."} Сохраните текст и повторите запуск; при повторении передайте это сообщение для проверки.`, retryable: false };
   }
