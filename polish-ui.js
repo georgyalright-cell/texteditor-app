@@ -32,20 +32,40 @@
     if (options.collect) budget.share = 1;
     if (!options.collect) root.RevisionPreview.clear();
     options.report("Редактирую текст. Варианты, прошедшие проверки, применяются автоматически.");
-    // Bounds a stalled GPU request without changing the source or export state.
-    let complete = false, modelUsed = false, timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; cancel("timeout"); }, 15 * 60 * 1000);
+    // Bound inactivity, not elapsed work: slow hardware may legitimately need
+    // more than 15 minutes while downloading or generating a large batch.
+    let complete = false, modelUsed = false, timedOut = false, generationError = null;
+    const requireGeneration = () => { if (generationError) throw generationError; };
+    const started = Date.now();
+    let timer;
+    const watch = () => {
+      const activity = Math.max(started, root.ModelRunStatus?.lastActivity?.() || 0);
+      if (Date.now() - activity >= 15 * 60 * 1000) { timedOut = true; cancel("timeout"); }
+      else timer = setTimeout(watch, 15000);
+    };
+    timer = setTimeout(watch, 15000);
     try {
       const result = await selector.polishSentences(options.text, {
         ...settings, ...budget, language: options.language, preferFresh: true,
-        contextual: true, fullCoverage: Boolean(options.collect), preview: true, score: ranker.score,
+        contextual: true, fullCoverage: Boolean(options.collect), preview: true,
+        score: (...args) => { requireGeneration(); return ranker.score(...args); },
         isCancelled: () => !current(),
-        semanticScore: settings.semantic ? (pairs) => root.SemanticScorer.score(pairs) : undefined,
+        semanticScore: settings.semantic ? async (pairs) => {
+          // CandidateSelect awaits every generation before invoking this hook.
+          // Do not keep the 1.5B generator resident while preparing embeddings.
+          root.Generator.cancel();
+          requireGeneration();
+          try { return await root.SemanticScorer.score(pairs); }
+          finally { root.SemanticScorer.cancel(); }
+        } : undefined,
         generate: async (sentence, context) => {
-          const variants = await root.Generator.paraphrase(sentence, {
-            ...context, ...settings, contextual: true, creative: settings.semantic, count: 4,
-          });
-          modelUsed = true; return variants;
+          try {
+            requireGeneration();
+            const variants = await root.Generator.paraphrase(sentence, {
+              ...context, ...settings, contextual: true, creative: settings.semantic, count: 4,
+            });
+            modelUsed = true; return variants;
+          } catch (error) { generationError ||= error; throw error; }
         },
       });
       if (!current()) return;

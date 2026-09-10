@@ -28,7 +28,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new root.Worker("generator-worker.js?v=53", { type: "module" });
+    worker = new root.Worker("generator-worker.js?v=54", { type: "module" });
     const instance = worker;
     worker.addEventListener("message", (event) => {
       if (worker !== instance) return;

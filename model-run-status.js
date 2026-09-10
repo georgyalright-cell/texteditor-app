@@ -80,6 +80,7 @@
         }
       },
       batch(done, total) { batchText = `Обработано порций: ${done} / ${total}. `; emit(); },
+      lastActivity() { return state.running ? lastProgress : 0; },
       progress(event = {}) {
         if (!state.running) return;
         if (event.diagnostic && (!diagnostic || diagnostic.category === "unknown")) diagnostic = event.diagnostic;

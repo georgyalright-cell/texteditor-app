@@ -113,12 +113,18 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker("neural-worker.js?v=53");
+    worker = new Worker("neural-worker.js?v=54");
     const instance = worker;
+    let lastProgress = "";
     worker.addEventListener("message", (event) => {
       if (worker !== instance) return;
       const message = event.data || {};
       if (message.type === "progress") {
+        const signature = JSON.stringify([message.message, message.progress]);
+        if (signature !== lastProgress) {
+          lastProgress = signature;
+          for (const waiting of pending.values()) waiting.touch();
+        }
         reportProgress(message);
         return;
       }
@@ -216,13 +222,15 @@
     selectionId += 1;
     const id = selectionId;
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        const error = new Error("Истекло время нейрооценки (timeout).");
+      let timer;
+      const touch = () => { clearTimeout(timer); timer = setTimeout(() => {
+        const error = new Error("Истекло время ожидания прогресса нейрооценки: 6 минут без ответа (timeout).");
         if (worker) worker.terminate(); worker = null; modelsWarm = false;
         for (const waiting of pending.values()) waiting.reject(error);
         pending.clear();
-      }, 6 * 60 * 1000);
-      pending.set(id, { resolve: (value) => { clearTimeout(timer); resolve(value); }, reject: (error) => { clearTimeout(timer); reject(error); } });
+      }, 6 * 60 * 1000); };
+      touch();
+      pending.set(id, { touch, resolve: (value) => { clearTimeout(timer); resolve(value); }, reject: (error) => { clearTimeout(timer); reject(error); } });
       try { ensureWorker().postMessage({ type: "scoreMany", id, texts: list, fullText: Boolean(options && options.fullText), perplexityOnly: Boolean(options && options.perplexityOnly) }); }
       catch (error) { clearTimeout(timer); pending.delete(id); reject(error); }
     });

@@ -47,6 +47,17 @@ test("batch limit rejects before creating a worker",async()=>{
   const {api,workers}=setup();await assert.rejects(api.scoreDetails(Array(33).fill("x")),/много/);
   assert.equal(workers.length,0);
 });
+test('scoring timeout follows changing progress, never duplicate heartbeats',async()=>{
+  const {api,workers,timers}=setup();const task=api.scoreDetails(['text']);
+  const initial=[...timers.keys()][0];
+  workers[0].reply({type:'progress',message:'Downloading',progress:1});
+  const renewed=[...timers.keys()][0];assert.notEqual(renewed,initial);assert.equal(timers.size,1);
+  workers[0].reply({type:'progress',message:'Downloading',progress:1});
+  assert.equal([...timers.keys()][0],renewed);
+  workers[0].reply({type:'progress',message:'Downloading',progress:2});
+  assert.notEqual([...timers.keys()][0],renewed);
+  workers[0].reply({type:'scores',scores:[]});await task;assert.equal(timers.size,0);
+});
 test('late events from a cancelled scorer cannot overwrite status or kill its replacement',async()=>{
   const {api,workers,elements}=setup();api.lockForPolish();
   const first=api.scoreDetails(['first']);api.cancelPolishScoring();await assert.rejects(first);
