@@ -10,7 +10,7 @@
     clear();
     if (!result.details.length) return;
     current = { onUndo };
-    document.getElementById("revisionPreviewTitle").textContent = `Применённые формулировки: ${result.details.length} · сравнить и отменить`;
+    document.getElementById("revisionPreviewTitle").textContent = "Применённые формулировки — сравнить и отменить";
     for (const detail of result.details) {
       const row = document.createElement("li"); row.className = "revision-choice";
       for (const [key, style] of [["before", "revision-before"], ["after", "revision-after"]]) {

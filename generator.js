@@ -9,6 +9,7 @@
   const pending = new Map();
   let worker = null;
   let requestId = 2000000;
+  let generation = 0;
 
   function supported() {
     return Boolean(root.navigator && root.navigator.gpu && root.Worker);
@@ -27,7 +28,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new root.Worker("generator-worker.js?v=48", { type: "module" });
+    worker = new root.Worker("generator-worker.js?v=49", { type: "module" });
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "progress") {
@@ -55,6 +56,7 @@
   }
 
   function cancel() {
+    generation++;
     if (worker) worker.terminate();
     worker = null;
     rejectPending(new Error("Редактура остановлена."));
@@ -66,9 +68,10 @@
     if (!supported()) return Promise.reject(new Error("WebGPU недоступен."));
     const settings = options || {};
     const count = Math.max(1, Math.min(Math.floor(Number(settings.count)) || MAX_VARIANTS, MAX_VARIANTS));
-    requestId += 1;
-    const id = requestId;
-    return new Promise((resolve, reject) => {
+    const operation = generation;
+    const request = () => new Promise((resolve, reject) => {
+      if (operation !== generation) { reject(new Error("Редактура остановлена.")); return; }
+      const id = ++requestId;
       pending.set(id, { resolve, reject });
       try { ensureWorker().postMessage({
         type: "paraphrase",
@@ -83,8 +86,12 @@
         context: settings.context,
         terms: settings.terms,
       }); } catch (error) { pending.delete(id); reject(error); }
-    }).catch((error) => {
-      if (error.message !== "Редактура остановлена.") report({ message: `Генератор недоступен: ${error.message}. Продолжаю со словарными версиями.`, isError: true });
+    });
+    const errors = root.ModelErrors || (typeof require === "function" ? require("./model-errors.js") : null);
+    const result = errors ? errors.retryOnce(request, { offline: () => root.navigator.onLine === false,
+      isCurrent: () => operation === generation, report: message => report({ message }) }) : request();
+    return result.catch((error) => {
+      if (error.message !== "Редактура остановлена.") report({ message: errors ? errors.explain(error, { offline: root.navigator.onLine === false }).message : `Генератор недоступен: ${error.message}. Продолжаю со словарными версиями.`, isError: true });
       throw error;
     });
   }

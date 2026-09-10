@@ -125,6 +125,28 @@ test("без WebGPU генератор отказывает, не создава
   await assert.rejects(api.paraphrase("Текст."), /WebGPU недоступен/);
 });
 
+test('generator retries a transient worker download failure once and not after cancel', async () => {
+  for (const cancelled of [false, true]) {
+    let calls = 0, api;
+    class Worker {
+      constructor() { this.listeners = {}; }
+      addEventListener(type, listener) { this.listeners[type] = listener; }
+      terminate() {}
+      postMessage(message) {
+        calls++;
+        this.listeners.message({ data: calls === 1
+          ? { type: 'error', id: message.id, message: 'Failed to fetch' }
+          : { type: 'variants', id: message.id, variants: ['Revised sentence.'] } });
+        if (cancelled) api.cancel();
+      }
+    }
+    api = create({ navigator: { gpu: {}, onLine: true }, Worker });
+    if (cancelled) await assert.rejects(api.paraphrase('Source sentence.'));
+    else assert.deepEqual(await api.paraphrase('Source sentence.'), ['Revised sentence.']);
+    assert.equal(calls, cancelled ? 1 : 2);
+  }
+});
+
 test("воркер использует локальный рантайм и закреплённую ревизию модели", () => {
   const workerSource = fs.readFileSync(require.resolve("./generator-worker.js"), "utf8");
   assert.match(workerSource, /\.\/vendor\/webllm\/web-llm\.mjs/);
@@ -143,5 +165,5 @@ test("глубокая редакция добавляет только конт
   assert.match(workerSource, /SAMPLING_TOP_P = 0\.92/u);
   assert.match(workerSource, /seed: samplingSeed\(request\.id\)/u);
   assert.doesNotMatch(workerSource, /seed:\s*20260903/u);
-  assert.match(generatorSource, /generator-worker\.js\?v=48/u);
+  assert.match(generatorSource, /generator-worker\.js\?v=49/u);
 });

@@ -56,10 +56,10 @@ test('same default pipeline runs grammar for fragments and document paragraphs w
   const result = pipeline.run(input);
   assert.match(result.text, /анализирует рынок/);
   assert.match(result.text, /поддерживает малый бизнес/);
-  assert.match(result.summary.join(' '), /Грамматика: автоматически исправлено 2/);
+  assert.match(result.summary.join(' '), /Грамматические правки.*применены автоматически/);
   const protectedResult = pipeline.run(input, { terms: ['анализ рынка', 'поддержку'] });
   assert.equal(protectedResult.text, input);
-  assert.doesNotMatch(protectedResult.summary.join(' '), /Грамматика:/);
+  assert.doesNotMatch(protectedResult.summary.join(' '), /Грамматические правки/);
 });
 
 test('author homework panels are not part of the editing UI', () => {

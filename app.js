@@ -70,7 +70,7 @@
   const processing = window.ProcessingRun.create({
     base: processSource,
     supported: () => Boolean(window.Generator && window.Generator.supported()),
-    polish: () => window.ReviewUI.polishWithModel(),
+    polish: () => window.ModelRunStatus ? window.ModelRunStatus.track(() => window.ReviewUI.polishWithModel()) : window.ReviewUI.polishWithModel(),
     cancel: () => { if (window.PolishUI) window.PolishUI.cancel(); },
     notice: (message) => window.NeuralScorerUI.reportProgress({ done: true, isError: true, message }),
     busy(value) {
@@ -274,6 +274,7 @@
   }
 
   function resetResult() {
+    if (window.ModelRunStatus) window.ModelRunStatus.clear();
     processing.cancel();
     currentBlocks = [];
     currentOutputKind = "";
@@ -358,7 +359,7 @@
     const deep = review && review.deepRevision;
     setResultState(
       deep
-        ? `Глубокая редакция · обновлено ${deep.replaced}`
+        ? "Глубокая редакция · текст обработан"
         : structured.text === context.source ? "Базовая правка · без замен" : "Базовая правка · текст изменён",
       structured.text === context.source && !deep ? "neutral" : "success",
     );
@@ -421,6 +422,7 @@
   }
 
   function processSource() {
+    if (window.ModelRunStatus) window.ModelRunStatus.clear();
     if (!elements.sourceText.value.trim()) return;
     try {
       const source = elements.sourceText.value;
@@ -594,7 +596,10 @@
     error: (message) => setStatus(elements.resultNote, message, true),
     notify: (message) => setStatus(elements.resultNote, message, false),
   });
-  function runProcessing() { return material && material.active() ? material.run() : processing.run(); }
+  function runProcessing() {
+    if (!processing.busy() && !(material && material.busy()) && window.ModelRunStatus) window.ModelRunStatus.clear();
+    return material && material.active() ? material.run() : processing.run();
+  }
 
   elements.sourceText.addEventListener("input", () => {
     if (material && material.active()) material.invalidate();
@@ -611,7 +616,7 @@
   elements.fileInput.addEventListener("change", () => loadFile(elements.fileInput.files[0]));
   elements.processButton.addEventListener("click", runProcessing);
   document.getElementById("polishButton").addEventListener("click", () => {
-    if (material && material.active()) return material.run({ withModel: true });
+    if (material && material.active()) return window.ModelRunStatus ? window.ModelRunStatus.track(() => material.run({ withModel: true })) : material.run({ withModel: true });
     if (currentResult && activeReview) return processing.run({ modelOnly: true });
   });
   document.getElementById("polishCancelButton").addEventListener("click", () => { processing.cancel(); if (material) material.cancel(); });
@@ -683,7 +688,7 @@
       const missing = [...assembled.blanks, ...assembled.inserted];
       setResultState(missing.length ? "Документ собран · проверьте комплектность" : "Документ собран", missing.length ? "neutral" : "success");
       renderCompliance({ problems: missing.length ? [{ title: "Проверьте недостающие данные и разделы", items: missing }] : [], notes: [] });
-      setStatus(elements.resultNote, `Базово изменено абзацев: ${changed}. Размещение соответствует предпросмотру; титульные страницы и оглавление добавлены. TXT не содержит фотографий — для полной работы скачайте DOCX.`, false);
+      setStatus(elements.resultNote, "Текст обработан. Размещение соответствует предпросмотру; титульные страницы и оглавление добавлены. TXT не содержит фотографий — для полной работы скачайте DOCX.", false);
     },
   });
   fillProfiles();

@@ -86,3 +86,17 @@ test('ordinary rebuild never resumes an interrupted model queue', async () => {
   await workspace.run({ withModel: true });
   assert.equal(calls.includes('resume'), true);
 });
+
+test('limited completed model pass remains retryable and keeps processed document', async () => {
+  const { workspace, calls, node, root } = fixture();
+  root.PolishUI.run = async ({ collect }) => collect({ details: [], modelLimited: true, modelUsed: false, generatorWarnings: ['Failed to fetch'] });
+  await workspace.run();
+  const partial = await workspace.run({ withModel: true }); workspace.controls();
+  assert.equal(partial.limited, true); assert.equal(partial.completed, true);
+  assert.equal(node('polishButton').disabled, false); assert.equal(node('polishButton').textContent, 'Повторить обработку моделью');
+  root.PolishUI.run = async ({ collect }) => collect({ details: [], modelUsed: true });
+  const retried = await workspace.run({ withModel: true }); workspace.controls();
+  assert.equal(retried.limited, false); assert.equal(retried.completed, true);
+  assert.equal(calls.filter(x => x === 'base').length, 1);
+  assert.equal(node('polishButton').disabled, true);
+});

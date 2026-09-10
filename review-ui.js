@@ -106,14 +106,8 @@
   }
 
   function renderEdits(edits, applied, keepList) {
-    const acceptedCount = edits.filter((edit) => edit.accepted).length;
-    nodes.editsCount.textContent = `${acceptedCount} из ${edits.length}`;
-
-    const share = applied.ok ? applied.removedShare : 0;
-    const target = state.proposal.reduction.target;
     nodes.editsGuard.textContent = applied.ok
-      ? `Сокращение ${Math.round(share * 100)}% при цели ${Math.round(target.min * 100)}–${Math.round(target.max * 100)}%. ` +
-        `Фактчек-гард: числа, даты, ссылки и единицы совпали с исходником.`
+      ? "Правки применены автоматически. Числа, даты, ссылки и единицы сверены с исходником."
       : applied.warnings.join(" ");
     nodes.editsGuard.classList.toggle("is-error", !applied.ok);
 
@@ -215,7 +209,7 @@
         renderHistory();
       });
       actions.append(restore, drop);
-      item.append(element("p", "history-label", version.label), meta, actions);
+      item.append(element("p", "history-label", String(version.label || "").replace(/, принято правок: \d+$/u, "")), meta, actions);
       list.appendChild(item);
     }
     nodes.historyList.appendChild(list);
@@ -308,6 +302,7 @@
       language: state.report.language,
       isCurrent: () => operation === state.operation,
       report(message, error) {
+        if (error && root.ModelRunStatus) root.ModelRunStatus.progress({ message, isError: true });
         nodes.editsGuard.classList.toggle("is-error", Boolean(error));
         nodes.editsGuard.textContent = message;
       },
@@ -318,12 +313,16 @@
         };
         update(result.text, Object.assign({}, state.context, { deepRevision, keepReviewed: true }));
         operation = state.operation;
-        nodes.editsGuard.textContent = `Автоматически применено ${result.replaced} замен. Числа и ссылки сверены.`;
+        nodes.editsGuard.textContent = "Проверенные формулировки применены. Числа и ссылки сверены.";
       },
     });
     if (result && operation === state.operation) root.RevisionPreview.showAutomatic(result, () => {
-      if (operation === state.operation) update(original, Object.assign({}, state.context, { deepRevision: null, keepReviewed: true }));
+      if (operation === state.operation) {
+        if (root.ModelRunStatus) root.ModelRunStatus.clear();
+        update(original, Object.assign({}, state.context, { deepRevision: null, keepReviewed: true }));
+      }
     });
+    return result;
   }
   function mount(handlers) {
     callbacks = handlers || {};
@@ -333,7 +332,6 @@
       reviewSummary: document.querySelector("#reviewSummary"),
       reportGrid: document.querySelector("#reportGrid"),
       reportOvershoot: document.querySelector("#reportOvershoot"),
-      editsCount: document.querySelector("#editsCount"),
       editsGuard: document.querySelector("#editsGuard"),
       editList: document.querySelector("#editList"),
       historyList: document.querySelector("#historyList"),
@@ -363,7 +361,7 @@
       const store = root.RevisionStore;
       if (!store || !state.workingText) return;
       store.save({
-        label: `${state.report.genreLabel}, принято правок: ${currentEdits().filter((edit) => edit.accepted).length}`,
+        label: state.report.genreLabel,
         text: state.workingText,
         words: state.report.words,
         offZone: state.report.counts.off + state.report.counts.overshoot,

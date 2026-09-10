@@ -29,8 +29,7 @@
   function summary(cleaningStats, paraphrased, humanized, typographyStats) {
     const parts = [];
     if (paraphrased.replacements > 0) {
-      const label = pluralForm(paraphrased.replacements, "оборот", "оборота", "оборотов");
-      parts.push(`Безопасные словарные правки: изменено ${paraphrased.replacements} ${label}.`);
+      parts.push("Словарная обработка выполнена.");
     } else {
       parts.push("Безопасные словарные правки: подходящих замен не найдено.");
     }
@@ -50,13 +49,10 @@
       );
     }
     const cleaning = changeSummary(cleaningStats);
-    if (cleaning.length) parts.push(`Дополнительно исправлено: ${cleaning.join(", ")}.`);
+    if (cleaning.length) parts.push("Техническая очистка текста выполнена.");
     const typographyChanges = root.Typography.changeCount(typographyStats);
     if (typographyChanges > 0) {
-      parts.push(
-        `Типографика: приведено ${typographyChanges} ` +
-          `${pluralForm(typographyChanges, "знак", "знака", "знаков")}.`,
-      );
+      parts.push("Типографика приведена к формату работы.");
     }
     return parts;
   }
@@ -167,7 +163,7 @@
     const summaryParts = termsChanged ? ["Защищённые термины сохранены; базовые замены не применены."] : summary(outcome.stats, paraphrased, humanized, typography.stats);
     const grammarApplied = !regressed && !termsChanged && finalText !== outcome.text
       ? (revised.edits || []).filter(edit => finalText.includes(edit.replacement)).length : 0;
-    if (grammarApplied) summaryParts.unshift(`Грамматика: автоматически исправлено ${grammarApplied} ${pluralForm(grammarApplied, "оборот", "оборота", "оборотов")} с согласованием слов.`);
+    if (grammarApplied) summaryParts.unshift("Грамматические правки с согласованием слов применены автоматически.");
     return {
       text: finalText,
       language: humanized.language,
@@ -188,15 +184,11 @@
   function reviewMessage(review) {
     if (!review) return "";
     if (review.deepRevision) {
-      const deep = review.deepRevision;
-      const share = Math.round((deep.changedWordShare || 0) * 100);
-      return `Глубокая редакция: обновлено ${deep.replaced} из ${deep.totalSentences} предложений, охвачено около ${share}% слов.`;
+      return "Модельные формулировки применены. Доступны сравнение и отмена.";
     }
     if (!review.editsTotal) return "";
-    if (!review.editsAccepted) return `Композиционные правки предложены (${review.editsTotal}), но ни одна не принята.`;
-    const label = pluralForm(review.editsAccepted, "правка", "правки", "правок");
-    const share = Math.round((review.applied.removedShare || 0) * 100);
-    return `Композиционные правки: принято ${review.editsAccepted} ${label} из ${review.editsTotal}, текст короче на ${share}%.`;
+    if (!review.applied || !review.applied.ok) return "Композиционные замены не применены: сохранён исходный текст. Подробности — в замечаниях.";
+    return review.editsAccepted ? "Композиционная обработка выполнена автоматически." : "Композиционная проверка завершена; исходные формулировки сохранены.";
   }
 
   return { run, headingCandidates, reviewMessage };

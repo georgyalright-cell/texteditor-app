@@ -126,3 +126,16 @@
     grid-template-columns: 1fr;
   }
 }
+.model-run-status {
+  padding: 14px 18px;
+  margin: 12px 0;
+  border: 1px solid var(--line);
+  border-left: 4px solid #335db6;
+  border-radius: 8px;
+  background: #f5f8ff;
+}
+.model-run-status p { margin: 6px 0 0; font-size: 13px; }
+.model-run-status[data-phase="done"] { border-left-color: #23784e; background: #edf8f1; }
+.model-run-status[data-phase="error"],
+.model-run-status[data-phase="partial"] { border-left-color: #ae6a16; background: #fff7e9; }
+.model-run-status[data-phase="cancelled"] { border-left-color: #6b7280; background: #f5f5f5; }

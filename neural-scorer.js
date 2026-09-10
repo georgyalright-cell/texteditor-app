@@ -29,6 +29,7 @@
 
   function reportProgress(message) {
     const detail = message || {};
+    if (root.ModelRunStatus) root.ModelRunStatus.progress(detail);
     elements.loadStatus.hidden = false;
     setStatus(detail.message || (detail.done ? "Работа моделей завершена. Итог — в отчёте о редактуре." : "Подготовка локальной модели…"), detail.isError);
     elements.progress.hidden = Boolean(detail.done) || !detail.message;
@@ -112,7 +113,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker("neural-worker.js?v=48");
+    worker = new Worker("neural-worker.js?v=49");
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "progress") {

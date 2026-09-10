@@ -33,5 +33,5 @@ test("общий контур сохраняет полный словарный
   assert.match(result.text, /2026/u);
   assert.match(result.text, /12,5/u);
   assert.match(result.text, /https:\/\/example\.com\/report/u);
-  assert.ok(result.summary.some((item) => /Безопасные словарные правки/u.test(item)));
+  assert.ok(result.summary.some((item) => /Словарная обработка/u.test(item)));
 });

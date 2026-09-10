@@ -11,6 +11,7 @@
     let storageNotice = "", lastReport = "";
     const active = () => projectMode && toggle.checked;
     function report(message, error = false) {
+      if (error && root.ModelRunStatus) root.ModelRunStatus.progress({ message, isError: true });
       lastReport = message;
       const full = [message, storageNotice].filter(Boolean).join(" ");
       status.textContent = full.length > 240 ? `${full.slice(0, 210)}… Подробности — в разделе замечаний.` : full;
@@ -55,9 +56,10 @@
       e.processButton.textContent = busy ? "Обрабатываю документ…" : "Обработать и собрать документ";
       e.processButton.disabled = !available || busy || pendingPaste || options.otherBusy();
       const polishButton = document.getElementById("polishButton");
-      const modelComplete = modelJob && modelJob.cursor === modelJob.jobs.length;
+      const queueComplete = modelJob && modelJob.cursor === modelJob.jobs.length;
+      const modelComplete = queueComplete && !modelJob.limited;
       polishButton.disabled = !processed || busy || pendingPaste || options.otherBusy() || !root.Generator.supported() || Boolean(modelComplete);
-      polishButton.textContent = modelComplete ? "Обработка моделью завершена" : modelJob ? "Продолжить обработку моделью" : "Дополнительно обработать моделью";
+      polishButton.textContent = modelComplete ? "Обработка моделью завершена" : queueComplete ? "Повторить обработку моделью" : modelJob ? "Продолжить обработку моделью" : "Дополнительно обработать моделью";
       e.clearButton.disabled = !available && !busy;
       e.sourceTitle.textContent = "Работа целиком из буфера";
       e.sourceText.placeholder = "Вставьте работу целиком";
@@ -148,6 +150,7 @@
       root.RevisionPreview.showAutomatic({ details: undo.details, replaced: undo.details.length }, () => {
         if (operation !== generation || processed !== base || !active()) return;
         try {
+          if (root.ModelRunStatus) root.ModelRunStatus.clear();
           processed = undo.blocks; modelJob = null; modelUndo = null;
           save();
           assemble(processed); report("Локальная редактура отменена. Базовая обработка, таблицы и фото сохранены.");
@@ -156,6 +159,7 @@
     }
     async function run({ withModel = false } = {}) {
       if (!active() || busy || pendingPaste || options.otherBusy()) return;
+      if (!withModel && root.ModelRunStatus) root.ModelRunStatus.clear();
       if (!source.length) {
         contentRevision++;
         const importGeneration = ++generation, text = e.sourceText.value;
@@ -182,11 +186,12 @@
         assemble(processed);
         if (!withModel) {
           showChoices();
-          report(`Документ собран: изменено абзацев ${changed}. Модель не запускалась. ${notes.join(" ")}`);
+          report(`Документ обработан и собран. Модель не запускалась. ${notes.join(" ")}`);
           return;
         }
-        if (!root.Generator.supported()) { report(`Документ собран: изменено абзацев ${changed}. WebGPU недоступен — выполнена базовая обработка. ${notes.join(" ")}`); return; }
-        if (!modelJob) modelJob = { ...root.MaterialProcessing.jobs(processed), base: processed, cursor: 0, details: [] };
+        if (!root.Generator.supported()) { report(`Документ собран. WebGPU недоступен — выполнена базовая обработка. ${notes.join(" ")}`, true); return { completed: false, reason: "WebGPU недоступен" }; }
+        if (modelJob && modelJob.cursor === modelJob.jobs.length && modelJob.limited) modelJob = null;
+        if (!modelJob) modelJob = { ...root.MaterialProcessing.jobs(processed), base: processed, cursor: 0, details: [], limited: false, modelUsed: false, reasons: [] };
         for (; modelJob.cursor < modelJob.jobs.length;) {
           if (!current()) return;
           const job = modelJob, piece = job.jobs[job.cursor]; let result = null;
@@ -197,6 +202,9 @@
           if (!current()) return;
           if (!result) { report(progress + "Порция не завершена. Нажмите «Продолжить обработку моделью» или скачайте текущий DOCX.", true); break; }
           const rankingWarning = /недоступна|пропущено/u.test(result.rankingSummary || "") ? [result.rankingSummary] : [];
+          job.limited ||= Boolean(result.modelLimited || (result.generatorWarnings || []).length || (result.warnings || []).length || rankingWarning.length);
+          job.modelUsed ||= result.modelUsed !== false;
+          job.reasons.push(...(result.generatorWarnings || []), ...(result.warnings || []), ...rankingWarning);
           notes = [...new Set([...notes, ...(result.generatorWarnings || []), ...(result.warnings || []), ...rankingWarning])];
           const nextDetails = [...job.details, ...result.details.map((detail) => ({ ...detail, start: detail.start + piece.offset, end: detail.end + piece.offset }))];
           processed = root.MaterialProcessing.apply(job.base, nextDetails);
@@ -207,8 +215,10 @@
         }
         if (current()) {
           showChoices();
-          if (modelJob.cursor === modelJob.jobs.length) report(`Документ собран. Базово изменено абзацев: ${changed}. Автоматически применено: ${modelJob.details.length} замен. ${notes.join(" ")}`);
+          if (modelJob.cursor === modelJob.jobs.length) report(`Документ обработан и собран. Проверенные формулировки применены. ${notes.join(" ")}`);
         }
+        return { completed: current() && modelJob.cursor === modelJob.jobs.length, replaced: modelJob.details.length,
+          limited: modelJob.limited, modelUsed: modelJob.modelUsed, reason: modelJob.reasons.join(" ") };
       } catch (error) { if (current()) report(error.message || "Не удалось собрать документ.", true); }
       finally {
         busy = false; options.update();
