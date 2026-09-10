@@ -51,6 +51,7 @@
       failure = api.failure(result);
       if (failure) { for (const w of [...(result && result.generatorWarnings || []), ...(result && result.warnings || []), result && result.rankingSummary].filter(Boolean)) warnings.add(w); break; }
       job.limited ||= Boolean(result.modelLimited);
+      job.assessmentNotes = [...new Set([...job.assessmentNotes, ...(result.assessmentNotes || [])])];
       job.modelUsed ||= result.modelUsed !== false;
       for (const warning of [...(result.generatorWarnings || []), ...(result.warnings || [])]) warnings.add(warning);
       if (result.rankingSummary) warnings.add(result.rankingSummary);
@@ -68,7 +69,7 @@
     }
     if (current()) options.report(`${api.progress(job)} ${failure || (job.cursor === job.jobs.length ? "Проход завершён." : "Остановлено.")} ${failure ? "Нажмите «Продолжить обработку моделью»." : ""}`, Boolean(failure));
     const outcome = latest || apply(source, []);
-    return Object.assign(outcome, { warnings: [...warnings], completed: !failure && job.cursor === job.jobs.length && current(), limited: job.limited, modelUsed: job.modelUsed,
+    return Object.assign(outcome, { warnings: [...warnings], completed: !failure && job.cursor === job.jobs.length && current(), limited: job.limited, modelUsed: job.modelUsed, assessmentNotes: job.assessmentNotes,
       reason: failure || (job.limited ? [...warnings].join(" ") : "") });
   }
   const api = { apply, run, recover, pending, finished, discard, cancel: () => { revision++; } };

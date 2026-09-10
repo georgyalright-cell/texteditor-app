@@ -12,12 +12,12 @@
     <meta name="referrer" content="no-referrer" />
     <title>TextEditor — обработка и сборка работ</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23108764'/%3E%3Cpath d='M8 9h16M16 9v15' stroke='white' stroke-width='3'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="styles.css?v=55" />
-    <link rel="stylesheet" href="workspace.css?v=55" />
-    <link rel="stylesheet" href="review.css?v=55" />
-    <link rel="stylesheet" href="neural-scorer.css?v=55" />
-    <link rel="stylesheet" href="help.css?v=55" />
-    <link rel="stylesheet" href="revision-preview.css?v=55" />
+    <link rel="stylesheet" href="styles.css?v=56" />
+    <link rel="stylesheet" href="workspace.css?v=56" />
+    <link rel="stylesheet" href="review.css?v=56" />
+    <link rel="stylesheet" href="neural-scorer.css?v=56" />
+    <link rel="stylesheet" href="help.css?v=56" />
+    <link rel="stylesheet" href="revision-preview.css?v=56" />
   </head>
   <body>
     <header class="site-header">
@@ -247,7 +247,7 @@
           <strong id="modelRunLabel" role="status" aria-live="polite"></strong>
           <p id="modelRunDetail"></p>
           <details id="modelRunDiagnostics" hidden>
-            <summary>Технические подробности ошибки</summary>
+            <summary id="modelRunDiagnosticsTitle">Технические подробности ошибки</summary>
             <pre id="modelRunTechnical"></pre>
             <p>Можно скопировать для проверки. Подробности доступны до следующего запуска, очистки или обновления страницы; документ никуда не отправляется.</p>
           </details>
@@ -420,68 +420,68 @@
       </p>
     </dialog>
 
-    <script src="vendor/mammoth/mammoth.browser.min.js?v=55" defer></script>
-    <script src="vendor/jszip/jszip.min.js?v=55" defer></script>
-    <script src="vendor/sheetjs/xlsx.full.min.js?v=55" defer></script>
-    <script src="format-profiles.js?v=55" defer></script>
-    <script src="reference-guard.js?v=55" defer></script>
-    <script src="typography.js?v=55" defer></script>
-    <script src="humanizer-metrics.js?v=55" defer></script>
-    <script src="anchor-guard.js?v=55" defer></script>
-    <script src="text-metrics.js?v=55" defer></script>
-    <script src="edit-passes.js?v=55" defer></script>
-    <script src="elicitation.js?v=55" defer></script>
-    <script src="revision-store.js?v=55" defer></script>
-    <script src="processor.js?v=55" defer></script>
-    <script src="paraphraser.js?v=55" defer></script>
-    <script src="rewriter.js?v=55" defer></script>
-    <script src="deep-revision.js?v=55" defer></script>
-    <script src="candidate-select.js?v=55" defer></script>
-    <script src="weak-spots.js?v=55" defer></script>
-    <script src="usage-baseline.js?v=55" defer></script>
-    <script src="humanizer-engine.js?v=55" defer></script>
-    <script src="grammar-edits.js?v=55" defer></script>
-    <script src="text-pipeline.js?v=55" defer></script>
-    <script src="structurer.js?v=55" defer></script>
-    <script src="document-builder.js?v=55" defer></script>
-    <script src="document-images.js?v=55" defer></script>
-    <script src="docx-writer.js?v=55" defer></script>
-    <script src="document-layout.js?v=55" defer></script>
-    <script src="table-format.js?v=55" defer></script>
-    <script src="table-docx.js?v=55" defer></script>
-    <script src="clipboard-document.js?v=55" defer></script>
-    <script src="document-clipboard.js?v=55" defer></script>
-    <script src="document-reader.js?v=55" defer></script>
-    <script src="source-docx.js?v=55" defer></script>
-    <script src="work-project.js?v=55" defer></script>
-    <script src="project-view.js?v=55" defer></script>
-    <script src="model-errors.js?v=55" defer></script>
-    <script src="model-run-status.js?v=55" defer></script>
-    <script src="gpu-support.js?v=55" defer></script>
-    <script src="neural-scorer.js?v=55" defer></script>
-    <script src="generator-core.js?v=55" defer></script>
-    <script src="generator.js?v=55" defer></script>
-    <script src="business-english.js?v=55" defer></script>
-    <script src="meaning-guard.js?v=55" defer></script>
-    <script src="revision-quality.js?v=55" defer></script>
-    <script src="revision-candidates.js?v=55" defer></script>
-    <script src="semantic-scorer.js?v=55" defer></script>
-    <script src="revision-preview.js?v=55" defer></script>
-    <script src="neural-ranking.js?v=55" defer></script>
-    <script src="polish-ui.js?v=55" defer></script>
-    <script src="review-ui.js?v=55" defer></script>
-    <script src="help-dialog.js?v=55" defer></script>
-    <script src="processing-run.js?v=55" defer></script>
-    <script src="material-processing.js?v=55" defer></script>
-    <script src="automatic-revision.js?v=55" defer></script>
-    <script src="model-checkpoint.js?v=55" defer></script>
-    <script src="fragment-recovery.js?v=55" defer></script>
-    <script src="material-view.js?v=55" defer></script>
-    <script src="material-draft.js?v=55" defer></script>
-    <script src="material-workspace.js?v=55" defer></script>
-    <script src="app-export.js?v=55" defer></script>
-    <script src="file-input.js?v=55" defer></script>
-    <script src="app.js?v=55" defer></script>
-    <script src="gpu-support-ui.js?v=55" defer></script>
+    <script src="vendor/mammoth/mammoth.browser.min.js?v=56" defer></script>
+    <script src="vendor/jszip/jszip.min.js?v=56" defer></script>
+    <script src="vendor/sheetjs/xlsx.full.min.js?v=56" defer></script>
+    <script src="format-profiles.js?v=56" defer></script>
+    <script src="reference-guard.js?v=56" defer></script>
+    <script src="typography.js?v=56" defer></script>
+    <script src="humanizer-metrics.js?v=56" defer></script>
+    <script src="anchor-guard.js?v=56" defer></script>
+    <script src="text-metrics.js?v=56" defer></script>
+    <script src="edit-passes.js?v=56" defer></script>
+    <script src="elicitation.js?v=56" defer></script>
+    <script src="revision-store.js?v=56" defer></script>
+    <script src="processor.js?v=56" defer></script>
+    <script src="paraphraser.js?v=56" defer></script>
+    <script src="rewriter.js?v=56" defer></script>
+    <script src="deep-revision.js?v=56" defer></script>
+    <script src="candidate-select.js?v=56" defer></script>
+    <script src="weak-spots.js?v=56" defer></script>
+    <script src="usage-baseline.js?v=56" defer></script>
+    <script src="humanizer-engine.js?v=56" defer></script>
+    <script src="grammar-edits.js?v=56" defer></script>
+    <script src="text-pipeline.js?v=56" defer></script>
+    <script src="structurer.js?v=56" defer></script>
+    <script src="document-builder.js?v=56" defer></script>
+    <script src="document-images.js?v=56" defer></script>
+    <script src="docx-writer.js?v=56" defer></script>
+    <script src="document-layout.js?v=56" defer></script>
+    <script src="table-format.js?v=56" defer></script>
+    <script src="table-docx.js?v=56" defer></script>
+    <script src="clipboard-document.js?v=56" defer></script>
+    <script src="document-clipboard.js?v=56" defer></script>
+    <script src="document-reader.js?v=56" defer></script>
+    <script src="source-docx.js?v=56" defer></script>
+    <script src="work-project.js?v=56" defer></script>
+    <script src="project-view.js?v=56" defer></script>
+    <script src="model-errors.js?v=56" defer></script>
+    <script src="model-run-status.js?v=56" defer></script>
+    <script src="gpu-support.js?v=56" defer></script>
+    <script src="neural-scorer.js?v=56" defer></script>
+    <script src="generator-core.js?v=56" defer></script>
+    <script src="generator.js?v=56" defer></script>
+    <script src="business-english.js?v=56" defer></script>
+    <script src="meaning-guard.js?v=56" defer></script>
+    <script src="revision-quality.js?v=56" defer></script>
+    <script src="revision-candidates.js?v=56" defer></script>
+    <script src="semantic-scorer.js?v=56" defer></script>
+    <script src="revision-preview.js?v=56" defer></script>
+    <script src="neural-ranking.js?v=56" defer></script>
+    <script src="polish-ui.js?v=56" defer></script>
+    <script src="review-ui.js?v=56" defer></script>
+    <script src="help-dialog.js?v=56" defer></script>
+    <script src="processing-run.js?v=56" defer></script>
+    <script src="material-processing.js?v=56" defer></script>
+    <script src="automatic-revision.js?v=56" defer></script>
+    <script src="model-checkpoint.js?v=56" defer></script>
+    <script src="fragment-recovery.js?v=56" defer></script>
+    <script src="material-view.js?v=56" defer></script>
+    <script src="material-draft.js?v=56" defer></script>
+    <script src="material-workspace.js?v=56" defer></script>
+    <script src="app-export.js?v=56" defer></script>
+    <script src="file-input.js?v=56" defer></script>
+    <script src="app.js?v=56" defer></script>
+    <script src="gpu-support-ui.js?v=56" defer></script>
   </body>
 </html>

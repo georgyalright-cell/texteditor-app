@@ -37,6 +37,21 @@ test('zero changes is an honest successful check, not a claim of rewriting', asy
   const f = fixture(); await f.status.track(async () => ({ completed: true, replaced: 0, modelUsed: true }));
   assert.equal(f.state().phase, 'done'); assert.match(f.state().detail, /замен не нашлось/);
 });
+test('completed editing with optional assessment notes confirms success without a fake error', async () => {
+  const f=fixture();
+  const assessmentNotes=['Перплексия: сравнено 6 текстовых вариантов; пропущено 1 (нет полной оценки).'];
+  await f.status.track(async()=>{
+    f.status.batch(200,200);
+    return {completed:true,modelUsed:true,replaced:3,limited:false,assessmentNotes};
+  });
+  assert.equal(f.state().phase,'done');assert.match(f.state().label,/✓/);
+  assert.match(f.state().detail,/200 \/ 200.*текст применён/);
+  assert.equal(f.state().diagnostic,null);assert.deepEqual(f.state().assessmentNotes,assessmentNotes);
+  assert.doesNotMatch(f.state().detail,/ошиб|повтор|пропущено/);
+  await f.status.track(async()=>({completed:false,reason:'Failed to fetch',assessmentNotes}));
+  assert.equal(f.state().phase,'error');assert.equal(f.state().diagnostic.category,'network');
+  assert.deepEqual(f.state().assessmentNotes,[]);
+});
 test('no eligible text does not claim the model ran', async () => {
   const f = fixture(); await f.status.track(async () => ({ completed: true, modelUsed: false }));
   assert.equal(f.state().phase, 'unchanged'); assert.doesNotMatch(f.state().label, /✓/);

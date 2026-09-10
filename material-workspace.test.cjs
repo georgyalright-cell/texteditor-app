@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-function fixture({ supported = true, interrupt = false } = {}) {
+function fixture({ supported = true, interrupt = false, draft = null } = {}) {
   const nodes = new Map(), calls = [];
   function node(id) {
     if (!nodes.has(id)) nodes.set(id, { checked: true, value: '', textContent: '',
@@ -12,11 +12,11 @@ function fixture({ supported = true, interrupt = false } = {}) {
     return nodes.get(id);
   }
   const elements = new Proxy({}, { get: (_, name) => node(name) });
-  elements.sourceText.value = 'Source paragraph (Smith, 2024).';
+  elements.sourceText.value = draft ? '' : 'Source paragraph (Smith, 2024).';
   const blocks = [{ type: 'paragraph', text: elements.sourceText.value },
     { type: 'table', rows: [['Value'], ['10']] }];
   const root = {
-    MaterialDraft: { load: async () => null, save: async () => {} },
+    MaterialDraft: { load: async () => draft, save: async () => {} },
     RevisionPreview: { clear() {}, showAutomatic() {} },
     MaterialView: { render() {} },
     DocumentImages: { validate() {} },
@@ -31,6 +31,7 @@ function fixture({ supported = true, interrupt = false } = {}) {
     MaterialProcessing: {
       base: async b => { calls.push('base'); return { blocks: b, changed: 1, warnings: [] }; },
       jobs: b => { calls.push('jobs'); return { jobs: [{ text: b[0].text, offset: 0 }] }; },
+      textMap: b => ({ text: b.map(x => x.text || '').join('\n') }),
       apply: b => b,
       accept: (b, previous, proposals) => ({ blocks: b, details: [...previous, ...proposals], rejected: 0 }),
     },
@@ -73,6 +74,27 @@ test('explicit whole-document model action reuses the processed result and marks
   workspace.controls();
   assert.equal(node('polishButton').disabled, true);
   assert.equal(node('polishButton').textContent, 'Обработка моделью завершена');
+});
+test('whole-document optional assessment coverage is saved and does not become a failed pass',async()=>{
+  const {workspace,root,node}=fixture();let saved;
+  const note='Перплексия: сравнено 6 текстовых вариантов; пропущено 2 (нет полной оценки).';
+  root.MaterialDraft.save=async value=>{saved=value;};
+  root.PolishUI.run=async({collect})=>collect({details:[],modelUsed:true,modelLimited:false,assessmentNotes:[note],rankingSummary:note});
+  await workspace.run();const result=await workspace.run({withModel:true});workspace.controls();
+  assert.equal(result.completed,true);assert.equal(result.limited,false);assert.equal(result.assessmentNotes[0],note);
+  assert.equal(node('polishButton').textContent,'Обработка моделью завершена');
+  assert.equal(node('polishButton').disabled,true);
+  assert.ok(JSON.stringify(saved).includes('assessmentNotes'));
+});
+test('restored completed document confirms readiness without inviting a disabled model action',async()=>{
+  const source=[{type:'paragraph',text:'Source paragraph (Smith, 2024).'},{type:'table',rows:[['Value'],['10']]}];
+  const modelJob={version:2,base:source,cursor:1,details:[],modelUsed:true,limited:true,
+    reasons:['Перплексия: сравнено 6 текстовых вариантов; пропущено 1 (нет полной оценки).']};
+  const {workspace,node,calls}=fixture({draft:{version:1,source,processed:source,modelJob}});
+  await workspace.ready;workspace.controls();
+  assert.match(node('materialStatus').textContent,/Обработка завершена.*повторный запуск не нужен/);
+  assert.equal(node('polishButton').textContent,'Обработка моделью завершена');
+  assert.equal(calls.includes('model'),false);
 });
 
 test('ordinary rebuild never resumes an interrupted model queue', async () => {

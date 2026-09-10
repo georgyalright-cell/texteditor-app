@@ -41,6 +41,16 @@ test('successful batch awaits document commit rather than claiming whole-pass co
   assert.equal(f.progress.at(-1).isError,false); assert.ok(f.calls.includes('release'));
   assert.equal(f.root.PolishUI.busy(),false);
 });
+test('optional PPL coverage is collected as a note without degrading the completed batch',async()=>{
+  const f=polishFixture();
+  const note='Перплексия: сравнено 6 текстовых вариантов; пропущено 2 (нет полной оценки).';
+  f.root.NeuralRanking.create=()=>({score(){},summary:()=>note,limited:()=>true,failed:()=>false,pair:()=>null});
+  await f.run();
+  const result=f.calls.find(x=>typeof x==='object');
+  assert.equal(result.modelUsed,true);assert.equal(result.modelLimited,false);assert.equal(result.rankingFailed,false);
+  assert.equal(result.assessmentNotes[0],note);
+  assert.equal(f.progress.at(-1).isError,false);assert.equal(f.progress.some(x=>x.diagnostic),false);
+});
 
 test('generator worker reports actual load vs inference stage and can run again',async()=>{
   const messages=[], listeners={}; let failLoad=true, failInference=false;

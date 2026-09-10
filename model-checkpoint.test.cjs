@@ -20,6 +20,32 @@ test('checkpoint rejects stale versions, changed output, invalid cursor and unco
   assert.ok(checkpoint.restore({...job, cursor:1, details:[detail]}, output));
   assert.equal(checkpoint.restore({...job, cursor:1, details:[{...detail, after:detail.after.replace('1-3','2-4')}]}, output), null);
 });
+test('optional assessment notes survive restore; only exact legacy coverage warnings are migrated',()=>{
+  const blocks=[{type:'paragraph',text:'The company reports stable growth.'}];
+  const note='Перплексия: сравнено 6 текстовых вариантов; пропущено 1 (нет полной оценки).';
+  const job={...checkpoint.create(blocks),cursor:1,modelUsed:true,assessmentNotes:[note]};
+  assert.deepEqual(checkpoint.restore(job,blocks).assessmentNotes,[note]);
+  const legacy={...job,assessmentNotes:undefined,limited:true,reasons:[note]};
+  const restored=checkpoint.restore(legacy,blocks);
+  assert.equal(restored.limited,false);assert.deepEqual(restored.assessmentNotes,[note]);
+  assert.equal(restored.cursor,1);assert.deepEqual(restored.details,[]);
+  for(const reasons of [[],[note,'Failed to fetch'],['Unknown'],[note+' GPU device lost']]) {
+    assert.equal(checkpoint.restore({...legacy,reasons},blocks).limited,true);
+  }
+});
+test('fragment completes and preserves optional assessment notes across reload without rerunning the model',async()=>{
+  let saved,calls=0;
+  const note='Перплексия: сравнено 2 текстовых вариантов; пропущено 2 (нет полной оценки).';
+  global.MaterialDraft={save:async value=>{saved=structuredClone(value);},load:async()=>saved};
+  global.PolishUI={run:async o=>{calls++;o.collect({details:[],modelUsed:true,modelLimited:false,assessmentNotes:[note]});}};
+  const options={text:'The company reviews supplier contracts to control operating costs.',isCurrent:()=>true,report(){},apply(){}};
+  try {
+    const result=await fresh().run(options);
+    assert.equal(result.completed,true);assert.equal(result.limited,false);assert.deepEqual(result.assessmentNotes,[note]);
+    const resumed=fresh();await resumed.recover();
+    assert.deepEqual((await resumed.run(options)).assessmentNotes,[note]);assert.equal(calls,1);
+  } finally {delete global.MaterialDraft;}
+});
 
 test('80/500 interrupted pass survives reload and completes only remaining 420 portions', async () => {
   let saved, calls = 0;

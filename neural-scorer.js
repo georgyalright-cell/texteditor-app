@@ -113,7 +113,7 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker("neural-worker.js?v=55");
+    worker = new Worker("neural-worker.js?v=56");
     const instance = worker;
     let lastProgress = "";
     worker.addEventListener("message", (event) => {

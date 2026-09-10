@@ -213,7 +213,8 @@
           const failure = root.ModelCheckpoint.failure(result);
           if (failure) { report(progress + failure + " Нажмите «Продолжить обработку моделью».", true); return { completed: false, reason: failure }; }
           const rankingWarning = /недоступна|пропущено/u.test(result.rankingSummary || "") ? [result.rankingSummary] : [];
-          job.limited ||= Boolean(result.modelLimited || (result.generatorWarnings || []).length || (result.warnings || []).length || rankingWarning.length);
+          job.limited ||= Boolean(result.modelLimited || (result.generatorWarnings || []).length || (result.warnings || []).length);
+          job.assessmentNotes = [...new Set([...job.assessmentNotes, ...(result.assessmentNotes || [])])];
           job.modelUsed ||= result.modelUsed !== false;
           job.reasons.push(...(result.generatorWarnings || []), ...(result.warnings || []), ...rankingWarning);
           notes = [...new Set([...notes, ...(result.generatorWarnings || []), ...(result.warnings || []), ...rankingWarning])];
@@ -234,7 +235,7 @@
           if (modelJob.cursor === modelJob.jobs.length) report(`Документ обработан и собран. Проверенные формулировки применены. ${notes.join(" ")}`);
         }
         return { completed: current() && modelJob.cursor === modelJob.jobs.length, replaced: modelJob.details.length,
-          limited: modelJob.limited, modelUsed: modelJob.modelUsed, reason: modelJob.reasons.join(" ") };
+          limited: modelJob.limited, modelUsed: modelJob.modelUsed, assessmentNotes: modelJob.assessmentNotes, reason: modelJob.reasons.join(" ") };
       } catch (error) { if (current()) report(error.message || "Не удалось собрать документ.", true); }
       finally {
         busy = false; options.update();
@@ -259,7 +260,10 @@
         root.ClipboardDocument.validate(draft.modelUndo.blocks); modelUndo = draft.modelUndo;
       }
       if (active()) { display(); showChoices(); } summary();
-      if (modelJob) report(root.ModelCheckpoint.progress(modelJob) + " Прогресс восстановлен. Модель запустится только по кнопке.");
+      if (modelJob) report(root.ModelCheckpoint.progress(modelJob) + (modelJob.cursor === modelJob.jobs.length
+        ? modelJob.limited ? " Восстановлен результат завершённого прохода с ограничениями. Документ доступен для скачивания."
+          : " Обработка завершена. Сохранённый результат восстановлен; повторный запуск не нужен."
+        : " Прогресс восстановлен. Модель запустится только по кнопке."));
       else if (draft.modelJob) report("Прежняя очередь не прошла проверку совместимости. Последний обработанный документ сохранён; следующий запуск модели начнёт новый проход. Предыдущую редактуру можно отменить в сравнении.");
     }).catch(() => report("Сохранённый черновик недоступен. Можно вставить материал заново.", true));
     return {

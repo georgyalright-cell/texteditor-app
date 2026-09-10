@@ -16,7 +16,7 @@
   }
   function create(base) {
     return { version: VERSION, base: structuredClone(base), ...root.MaterialProcessing.jobs(base),
-      cursor: 0, details: [], limited: false, modelUsed: false, reasons: [] };
+      cursor: 0, details: [], limited: false, modelUsed: false, reasons: [], assessmentNotes: [] };
   }
   // Rebuild offsets from the saved source; never trust stored jobs or apply them
   // to a different document. Existing anchor checks validate every saved edit.
@@ -32,8 +32,15 @@
       const guard = root.AnchorGuard || (typeof require === "function" ? require("./anchor-guard.js") : null);
       if (before !== after && (!guard || !guard.compare(before, after).ok)) return null;
       if (root.SourceDocx && !root.SourceDocx.integrity(output).ok) return null;
-      return Object.assign(job, { cursor: saved.cursor, details: saved.details, limited: Boolean(saved.limited),
-        modelUsed: Boolean(saved.modelUsed), reasons: Array.isArray(saved.reasons) ? saved.reasons.filter(s => typeof s === "string") : [] });
+      const reasons = Array.isArray(saved.reasons) ? saved.reasons.filter(s => typeof s === "string") : [];
+      const assessmentNotes = Array.isArray(saved.assessmentNotes) ? saved.assessmentNotes.filter(s => typeof s === "string") : [];
+      // v55 persisted optional PPL coverage as failure. Migrate only the exact
+      // known summaries; an unknown or runtime error must keep its limited flag.
+      const coverageOnly = Boolean(saved.limited) && reasons.length > 0 && reasons.every(s =>
+        /^Перплексия: сравнено \d+ текстовых вариантов(?:; пропущено \d+ \(нет полной оценки\))?\.$/u.test(s));
+      return Object.assign(job, { cursor: saved.cursor, details: saved.details, limited: Boolean(saved.limited) && !coverageOnly,
+        modelUsed: Boolean(saved.modelUsed), reasons: coverageOnly ? [] : reasons,
+        assessmentNotes: [...new Set([...assessmentNotes, ...(coverageOnly ? reasons : [])])] });
     } catch { return null; }
   }
   function failure(result) {

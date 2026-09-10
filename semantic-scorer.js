@@ -13,7 +13,7 @@
     if (!pairs.length) return Promise.resolve([]);
     return new Promise((resolve, reject) => {
       if (!worker) {
-        worker = new root.Worker("semantic-worker.js?v=55");
+        worker = new root.Worker("semantic-worker.js?v=56");
         const instance = worker;
         let lastProgress = "";
         worker.onmessage = ({ data }) => {

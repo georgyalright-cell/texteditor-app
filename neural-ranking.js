@@ -19,25 +19,31 @@
       const base = await options.baseline(texts);
       const groups = context && context.groups || [];
       assertCurrent();
-      if (!groups.some((g) => g.count > 1)) return base;
+      // Singletons have no alternative to compare. Do not send them to the
+      // scorer or count its token-window rejection as an incomplete comparison.
+      const comparisons = groups.filter((g) => g.count > 1);
+      if (!comparisons.length) return base;
+      const comparisonTexts = comparisons.flatMap((g) => texts.slice(g.offset, g.offset + g.count));
       // Generation has finished. Terminate its worker before loading scorers,
       // rather than relying on an asynchronous fire-and-forget unload message.
       options.releaseGenerator();
       let details;
       try {
-        details = await options.engine.scoreDetails(texts, { fullText: true, perplexityOnly: true });
+        details = await options.engine.scoreDetails(comparisonTexts, { fullText: true, perplexityOnly: true });
         assertCurrent();
-        if (!Array.isArray(details) || details.length !== texts.length) throw new Error("Неполный ответ нейрооценки.");
+        if (!Array.isArray(details) || details.length !== comparisonTexts.length) throw new Error("Неполный ответ нейрооценки.");
       } catch (error) {
         assertCurrent();
         if (options.engine && options.engine.cancelPolishScoring) options.engine.cancelPolishScoring();
         warning = `Перплексия недоступна: ${String(error.message || "ошибка модели").replace(/[.\s]+$/, "")}. Использован обычный отбор`;
-        skipped = texts.length;
+        skipped += comparisonTexts.length;
         return base;
       }
       const result = base.slice();
-      for (const group of groups) {
-        const items = details.slice(group.offset, group.offset + group.count);
+      let cursor = 0;
+      for (const group of comparisons) {
+        const items = details.slice(cursor, cursor + group.count);
+        cursor += group.count;
         // Compare like with like: no candidate-only bonus or prefix scoring.
         if (!items.every(valid)) { skipped += group.count; continue; }
         checked += group.count;

@@ -45,6 +45,26 @@ test("no candidates means no extra model download",async()=>{
   const {ranker,order}=setup([]);
   assert.deepEqual(await ranker.score(["a"],{groups:[{offset:0,count:1}]}),[10]);assert.deepEqual(order,[]);
 });
+test("singleton texts are excluded from mixed PPL batches without shifting original offsets",async()=>{
+  const texts=["short","source1","a","b","unchanged","source2","c","d","long"];
+  let requested;
+  const {ranker}=setup([],{engine:{scoreDetails:async values=>{
+    requested=values;
+    return values.map(value=>item(value==='a'||value==='d'?4:3));
+  }}});
+  const groups=[{offset:0,count:1},{offset:1,count:3},{offset:4,count:1},{offset:5,count:3},{offset:8,count:1}];
+  assert.deepEqual(await ranker.score(texts,{groups}),[10,10,14,10,10,10,10,14,10]);
+  assert.deepEqual(requested,["source1","a","b","source2","c","d"]);
+  assert.equal(ranker.summary(),"Перплексия: сравнено 6 текстовых вариантов.");
+  assert.equal(ranker.limited(),false);assert.equal(ranker.failed(),false);
+  assert.ok(ranker.pair("source2","d"));assert.equal(ranker.pair("short","a"),null);
+});
+test("a genuinely incomplete comparison is retained as coverage, not a runtime failure",async()=>{
+  const {ranker}=setup([item(3),null,item(3),item(4)]);
+  assert.deepEqual(await ranker.score(["a","b","singleton","c","d"],{groups:[{offset:0,count:2},{offset:2,count:1},{offset:3,count:2}]}),[10,10,10,10,14]);
+  assert.equal(ranker.limited(),true);assert.equal(ranker.failed(),false);
+  assert.match(ranker.summary(),/сравнено 2.*пропущено 2/);
+});
 test("shortlist supplies original and at most two eligible variants per sentence",async()=>{
   const source="The company can reduce operating costs by reviewing supplier contracts and improving its purchasing process.";
   let seen;

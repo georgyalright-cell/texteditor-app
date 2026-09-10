@@ -73,7 +73,8 @@
       const warnings = (result.generatorWarnings || []).join(". ");
       complete = !warnings && !(result.warnings || []).length && !ranker.failed();
       result.modelUsed = modelUsed;
-      result.modelLimited = Boolean(warnings) || Boolean(result.warnings && result.warnings.length) || ranker.limited();
+      result.modelLimited = !complete;
+      result.assessmentNotes = ranker.limited() && !ranker.failed() ? [ranker.summary()] : [];
       result.rankingFailed = ranker.failed();
       for (const detail of result.details) detail.neural = ranker.pair(detail.before, detail.after);
       if (!complete && engine && root.ModelErrors) engine.reportProgress(root.ModelErrors.event(

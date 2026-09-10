@@ -12,10 +12,13 @@
     root.document.getElementById("modelRunDetail").textContent = state.detail;
     const diagnostics = root.document.getElementById("modelRunDiagnostics");
     if (diagnostics) {
-      diagnostics.hidden = !state.diagnostic;
-      if (!state.diagnostic) diagnostics.open = false;
+      diagnostics.hidden = !state.diagnostic && !state.assessmentNotes?.length;
+      if (state.running || diagnostics.hidden) diagnostics.open = false;
+      const summary = root.document.getElementById("modelRunDiagnosticsTitle");
+      if (summary) summary.textContent = state.diagnostic ? "Технические подробности ошибки" : "Подробности дополнительной проверки";
       root.document.getElementById("modelRunTechnical").textContent = state.diagnostic
-        ? `Этап: ${state.diagnostic.stage}\nКатегория: ${state.diagnostic.category}\n${state.diagnostic.technical}\nБраузер: ${root.navigator?.userAgent || "не определён"}\nWebGPU API: ${Boolean(root.navigator?.gpu)}\nСеть (по данным браузера): ${root.navigator?.onLine === false ? "нет" : "доступна или не определена"}` : "";
+        ? `Этап: ${state.diagnostic.stage}\nКатегория: ${state.diagnostic.category}\n${state.diagnostic.technical}\nБраузер: ${root.navigator?.userAgent || "не определён"}\nWebGPU API: ${Boolean(root.navigator?.gpu)}\nСеть (по данным браузера): ${root.navigator?.onLine === false ? "нет" : "доступна или не определена"}`
+        : state.assessmentNotes?.length ? "Дополнительная оценка перплексии доступна не для всех вариантов. В этих случаях использован обычный отбор; проверки ссылок, чисел и смысла не отключались. Это не остановка редакции.\n" + state.assessmentNotes.join("\n") : "";
     }
     // The run owns the final outcome; loader readiness is not completion.
     if (!state.running && state.phase !== "idle") {
@@ -43,10 +46,10 @@
           ? "Ожидаем ответ загрузчика или WebGPU. Причина пока неизвестна; можно остановить и повторить запуск."
           : "Дождитесь итогового статуса. Загрузка файлов — только один из этапов.") });
     }
-    function finish(phase, label, detail = "Текущий текст сохранён.") {
+    function finish(phase, label, detail = "Текущий текст сохранён.", assessmentNotes = []) {
       if (timer !== null) stop(timer);
       timer = null; state = { phase, label, detail: batchText + detail, running: false,
-        diagnostic: ["error", "partial"].includes(phase) ? diagnostic : null }; emit();
+        diagnostic: ["error", "partial"].includes(phase) ? diagnostic : null, assessmentNotes }; emit();
     }
     return {
       async track(work) {
@@ -69,7 +72,7 @@
           else if (result.modelUsed === false) finish("unchanged", "Модель не запускалась: нет подходящих предложений");
           else finish("done", "✓ Обработка моделью завершена", result.replaced
             ? "Перефразированный текст применён и готов к копированию или скачиванию."
-            : "Модель проверила текст, но подходящих замен не нашлось. Исходные формулировки сохранены.");
+            : "Модель проверила текст, но подходящих замен не нашлось. Исходные формулировки сохранены.", result.assessmentNotes || []);
           return result;
         } catch (error) {
           if (current === ticket && state.running) {
