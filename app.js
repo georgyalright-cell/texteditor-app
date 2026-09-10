@@ -60,10 +60,8 @@
   let currentMode = "fragment";
   let currentResult = "";
   let currentBlocks = [];
-  let currentOutputKind = "";
-  let currentOutputProfileId = "";
-  let currentProcessedPart = "";
-  let sourceFilename = "";
+  let currentOutputKind = "", currentOutputProfileId = "";
+  let currentProcessedPart = "", sourceFilename = "";
   let project = loadProject();
   let activeReview = null;
   let material = null;
@@ -175,7 +173,7 @@
     elements.processButton.disabled = !hasSource || processing.busy();
     const polishButton = document.getElementById("polishButton");
     polishButton.disabled = !hasResult || !activeReview || processing.busy() || !window.Generator.supported();
-    polishButton.textContent = "Дополнительно обработать моделью";
+    window.FragmentRecovery.controls(polishButton, window.ReviewUI.currentText());
     elements.clearButton.disabled = !hasSource && !hasResult;
     elements.downloadButton.disabled = !hasResult;
     elements.downloadDocxButton.disabled = !hasResult || !currentBlocks.length;
@@ -195,8 +193,6 @@
       ["Штампы", "cliche"],
       ["Антитезы", "antithesis"],
     ];
-    // Показываем «было → стало»: без исходной оценки не видно, что цикл
-    // вообще что-то сделал, а именно за этим сюда и смотрят.
     const cells = signals.map(([label, key]) => {
       const value = result[key];
       if (!before || before[key] === value) return [label, `${value}`, value];
@@ -319,15 +315,15 @@
     }
   }
 
-  function pipelineProfileId() {
-    return currentMode === "project" ? selectedProfileId() : "academic-report";
-  }
+  function pipelineProfileId() { return currentMode === "project" ? selectedProfileId() : "academic-report"; }
 
-  function startReview(source, processed, kind, profileId) {
+  function startReview(source, processed, kind, profileId, keepReviewed = false) {
+    if (!keepReviewed) window.FragmentRecovery.discard();
     activeReview = { source, processed, kind, profileId };
     const profile = window.FormatProfiles.get(profileId);
     if (window.ReviewUI) {
       window.ReviewUI.update(processed.text, {
+        keepReviewed,
         terms: processed.terms || [],
         strictSections: profile.strictSections,
         headings: window.TextPipeline.headingCandidates(processed.text),
@@ -570,8 +566,12 @@
     }
   }
 
-  function clearCurrent() {
-    if (material && material.active()) material.clear();
+  async function clearCurrent() {
+    const clearingText = elements.sourceText.value, clearingMode = currentMode;
+    processing.cancel();
+    if (material && material.active()) await material.clear();
+    else { window.ReviewUI.reset(); await window.FragmentRecovery.discard(); }
+    if (elements.sourceText.value !== clearingText || currentMode !== clearingMode) return;
     elements.sourceText.value = "";
     elements.partTitle.value = "";
     sourceFilename = "";
@@ -602,6 +602,7 @@
   }
 
   elements.sourceText.addEventListener("input", () => {
+    if (!material || !material.active()) window.FragmentRecovery.discard();
     if (material && material.active()) material.invalidate();
     setStatus(elements.sourceStatus, "", false);
     if (currentResult) resetResult();
@@ -667,9 +668,8 @@
 
   if (window.ReviewUI) {
     window.ReviewUI.mount({
-      onApply(text, review) {
-        applyReviewedText(text, review);
-      },
+      onRecover: text => window.FragmentRecovery.restore(text, { elements, currentMode: () => currentMode, startReview, updateControls }),
+      onApply: applyReviewedText,
       onRestore(text) {
         elements.sourceText.value = text;
         updateControls();
@@ -695,4 +695,5 @@
   hydrateMetadata();
   renderProject();
   setMode("fragment");
+  material.ready.then(() => window.ReviewUI.recover());
 })();

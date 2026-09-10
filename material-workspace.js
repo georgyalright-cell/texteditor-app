@@ -20,13 +20,15 @@
     }
     function save() {
       const operation = generation;
-      root.MaterialDraft.save(source.length ? { version: 1, source, processed, modelUndo, changed, profileId: options.profile(), notes } : null).then(() => {
+      return root.MaterialDraft.save(source.length ? { version: 1, source, processed, modelJob, modelUndo, changed, profileId: options.profile(), notes } : null).then(() => {
         if (generation === operation && storageNotice) { storageNotice = ""; report(lastReport); }
+        return true;
       }).catch(() => {
         if (generation === operation) {
           storageNotice = "Черновик остался только в этой вкладке: браузер не разрешил сохранение. Скачайте DOCX перед закрытием.";
           report(lastReport, true);
         }
+        return false;
       });
     }
     function cancel() {
@@ -57,9 +59,9 @@
       e.processButton.disabled = !available || busy || pendingPaste || options.otherBusy();
       const polishButton = document.getElementById("polishButton");
       const queueComplete = modelJob && modelJob.cursor === modelJob.jobs.length;
-      const modelComplete = queueComplete && !modelJob.limited;
+      const modelComplete = queueComplete;
       polishButton.disabled = !processed || busy || pendingPaste || options.otherBusy() || !root.Generator.supported() || Boolean(modelComplete);
-      polishButton.textContent = modelComplete ? "Обработка моделью завершена" : queueComplete ? "Повторить обработку моделью" : modelJob ? "Продолжить обработку моделью" : "Дополнительно обработать моделью";
+      polishButton.textContent = modelComplete ? (modelJob.limited ? "Проход завершён с ограничениями" : "Обработка моделью завершена") : modelJob ? "Продолжить обработку моделью" : "Дополнительно обработать моделью";
       e.clearButton.disabled = !available && !busy;
       e.sourceTitle.textContent = "Работа целиком из буфера";
       e.sourceText.placeholder = "Вставьте работу целиком";
@@ -190,17 +192,19 @@
           return;
         }
         if (!root.Generator.supported()) { report(`Документ собран. WebGPU недоступен — выполнена базовая обработка. ${notes.join(" ")}`, true); return { completed: false, reason: "WebGPU недоступен" }; }
-        if (modelJob && modelJob.cursor === modelJob.jobs.length && modelJob.limited) modelJob = null;
-        if (!modelJob) modelJob = { ...root.MaterialProcessing.jobs(processed), base: processed, cursor: 0, details: [], limited: false, modelUsed: false, reasons: [] };
+        if (!modelJob) modelJob = root.ModelCheckpoint.create(processed);
+        if (!await save()) return { completed: false, reason: storageNotice };
         for (; modelJob.cursor < modelJob.jobs.length;) {
           if (!current()) return;
           const job = modelJob, piece = job.jobs[job.cursor]; let result = null;
-          const progress = `Локальная редактура: порция ${job.cursor + 1} / ${job.jobs.length}. `;
-          report(progress + "Можно остановить и продолжить в этой вкладке.");
+          const progress = root.ModelCheckpoint.progress(job) + ` Сейчас порция ${job.cursor + 1}. `;
+          report(progress + "Можно остановить и продолжить позже.");
           await root.PolishUI.run({ text: piece.text, language: root.RuleParaphraser.detectLanguage(piece.text), isCurrent: current,
             collect: (value) => { result = value; }, report: (message, error) => report(progress + message, error) });
           if (!current()) return;
           if (!result) { report(progress + "Порция не завершена. Нажмите «Продолжить обработку моделью» или скачайте текущий DOCX.", true); break; }
+          const failure = root.ModelCheckpoint.failure(result);
+          if (failure) { report(progress + failure + " Нажмите «Продолжить обработку моделью».", true); return { completed: false, reason: failure }; }
           const rankingWarning = /недоступна|пропущено/u.test(result.rankingSummary || "") ? [result.rankingSummary] : [];
           job.limited ||= Boolean(result.modelLimited || (result.generatorWarnings || []).length || (result.warnings || []).length || rankingWarning.length);
           job.modelUsed ||= result.modelUsed !== false;
@@ -211,7 +215,9 @@
           job.details = nextDetails;
           if (nextDetails.length) modelUndo = { blocks: job.base, details: nextDetails };
           job.cursor++;
-          save(); assemble(processed);
+          assemble(processed);
+          root.ModelCheckpoint.progress(job);
+          if (!await save()) return { completed: false, reason: storageNotice };
         }
         if (current()) {
           showChoices();
@@ -229,7 +235,7 @@
     e.sourceText.addEventListener("paste", paste); preview.addEventListener("paste", paste);
     preview.addEventListener("keydown", (event) => { if (!event.target.closest("input, textarea") && (event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); run(); } });
     const initialContent = contentRevision;
-    root.MaterialDraft.load().then(async (draft) => {
+    const ready = root.MaterialDraft.load().then(async (draft) => {
       if (!draft || draft.version !== 1 || contentRevision !== initialContent || e.sourceText.value) return;
       root.ClipboardDocument.validate(draft.source);
       if (draft.processed) root.ClipboardDocument.validate(draft.processed);
@@ -238,16 +244,22 @@
       source = root.DocumentLayout.prepare(draft.source); notes = Array.isArray(draft.notes) ? draft.notes : [];
       processed = draft.processed ? draft.processed.map((b, i) => source[i].type !== draft.source[i].type ? structuredClone(source[i]) : b) : null;
       changed = Number(draft.changed) || 0;
+      modelJob = root.ModelCheckpoint.restore(draft.modelJob, processed);
       if (draft.modelUndo && Array.isArray(draft.modelUndo.details) && draft.modelUndo.blocks?.length === source.length) {
         root.ClipboardDocument.validate(draft.modelUndo.blocks); modelUndo = draft.modelUndo;
       }
       if (active()) { display(); showChoices(); } summary();
+      if (modelJob) report(root.ModelCheckpoint.progress(modelJob) + " Прогресс восстановлен. Модель запустится только по кнопке.");
     }).catch(() => report("Сохранённый черновик недоступен. Можно вставить материал заново.", true));
     return {
-      active, controls, run, cancel, busy: () => busy,
+      ready, active, controls, run, cancel, busy: () => busy,
       setMode(value) { if (value !== projectMode) cancel(); projectMode = value; if (active() && source.length) { display(); showChoices(); } controls(); },
       invalidate(keepProcessed = false) { cancel(); modelJob = null; if (!keepProcessed) { contentRevision++; processed = null; modelUndo = null; } else { save(); showChoices(); } },
-      clear() { invalidate(); source = []; notes = []; save(); display(); report(""); },
+      async clear() {
+        invalidate(); const operation = generation; source = []; notes = [];
+        const saved = await save();
+        if (operation === generation) { display(); if (saved) report(""); }
+      },
     };
   }
   root.MaterialWorkspace = { mount };

@@ -11,21 +11,21 @@
     });
     return database;
   }
-  async function transaction(value, write) {
+  async function transaction(value, write, key = "current") {
     const database = await db();
     return new Promise((resolve, reject) => {
       const tx = database.transaction("drafts", write ? "readwrite" : "readonly");
       const store = tx.objectStore("drafts");
-      const request = write ? value ? store.put(value, "current") : store.delete("current") : store.get("current");
+      const request = write ? value ? store.put(value, key) : store.delete(key) : store.get(key);
       tx.oncomplete = () => resolve(request.result);
       tx.onerror = tx.onabort = () => reject(tx.error || new Error("Не удалось сохранить черновик."));
     });
   }
   root.MaterialDraft = {
-    load: () => transaction(null, false),
-    save(value) {
+    load: (key) => transaction(null, false, key),
+    save(value, key) {
       const snapshot = value ? structuredClone(value) : null;
-      queue = queue.catch(() => {}).then(() => transaction(snapshot, true)); return queue;
+      queue = queue.catch(() => {}).then(() => transaction(snapshot, true, key)); return queue;
     },
   };
 })(window);

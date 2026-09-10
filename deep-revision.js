@@ -223,7 +223,7 @@
       });
     if (!eligible.length) return [];
 
-    const share = Math.max(0.15, Math.min(Number(settings.share) || DEFAULT_SHARE, 0.6));
+    const share = settings.fullCoverage ? 1 : Math.max(0.15, Math.min(Number(settings.share) || DEFAULT_SHARE, 0.6));
     const limit = Math.max(1, Math.min(Number(settings.limit) || DEFAULT_LIMIT, DEFAULT_LIMIT));
     const desired = Math.max(1, Math.min(limit, eligible.length, Math.ceil(spans.length * share)));
     const positives = eligible

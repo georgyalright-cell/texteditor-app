@@ -16,6 +16,7 @@
   function create({ render, now = Date.now, every = setInterval, stop = clearInterval }) {
     let ticket = 0, timer = null, started = 0, lastProgress = 0, stamp = "";
     let lastFailure = "";
+    let batchText = "";
     const errors = root.ModelErrors || (typeof require === "function" ? require("./model-errors.js") : null);
     const reason = error => errors ? errors.explain(error, { offline: Boolean(root.navigator && root.navigator.onLine === false) }).message : "Модуль диагностики не загрузился. Сохраните текст и обновите страницу; обработка моделью не подтверждена.";
     let state = { phase: "idle", running: false, label: "", detail: "" };
@@ -24,19 +25,19 @@
       const seconds = Math.floor((now() - started) / 1000);
       const stalled = now() - lastProgress >= 45000;
       render({ ...state, label: stalled ? "⏳ Давно нет прогресса — обработка ещё не завершена" : "⏳ Модель обрабатывает текст",
-        detail: `Прошло ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}. ` + (stalled
+        detail: batchText + `Прошло ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}. ` + (stalled
           ? "Ожидаем ответ загрузчика или WebGPU. Причина пока неизвестна; можно остановить и повторить запуск."
           : "Дождитесь итогового статуса. Загрузка файлов — только один из этапов.") });
     }
     function finish(phase, label, detail = "Текущий текст сохранён.") {
       if (timer !== null) stop(timer);
-      timer = null; state = { phase, label, detail, running: false }; emit();
+      timer = null; state = { phase, label, detail: batchText + detail, running: false }; emit();
     }
     return {
       async track(work) {
         if (state.running) return;
         const current = ++ticket;
-        started = lastProgress = now(); stamp = ""; lastFailure = "";
+        started = lastProgress = now(); stamp = ""; lastFailure = ""; batchText = "";
         state = { phase: "running", running: true }; emit();
         timer = every(emit, 1000);
         try {
@@ -54,6 +55,7 @@
           throw error;
         }
       },
+      batch(done, total) { batchText = `Обработано порций: ${done} / ${total}. `; emit(); },
       progress(event = {}) {
         if (!state.running) return;
         if (event.isError && event.message && (!lastFailure || errors && errors.explain(event.message).category !== "unknown")) lastFailure = event.message;
@@ -66,7 +68,7 @@
         if (reason === "timeout") finish("error", "! Истекло время ожидания модели", "Обработка не завершена. Текущий текст сохранён; можно повторить запуск.");
         else finish("cancelled", "■ Обработка моделью остановлена", "Завершённые изменения сохранены. Полный проход не выполнен.");
       },
-      clear() { ++ticket; finish("idle", "", ""); },
+      clear() { ++ticket; batchText = ""; finish("idle", "", ""); },
     };
   }
   return { create };

@@ -316,10 +316,12 @@
         nodes.editsGuard.textContent = "Проверенные формулировки применены. Числа и ссылки сверены.";
       },
     });
-    if (result && operation === state.operation) root.RevisionPreview.showAutomatic(result, () => {
+    if (result && operation === state.operation) root.RevisionPreview.showAutomatic(result, async () => {
       if (operation === state.operation) {
         if (root.ModelRunStatus) root.ModelRunStatus.clear();
-        update(original, Object.assign({}, state.context, { deepRevision: null, keepReviewed: true }));
+        await root.FragmentRecovery.discard();
+        if (operation !== state.operation) return;
+        update(result.source || original, Object.assign({}, state.context, { deepRevision: null, keepReviewed: true }));
       }
     });
     return result;
@@ -370,5 +372,15 @@
     });
   }
 
-  root.ReviewUI = { mount, update, reset, genreId, polishWithModel, currentText: () => state.workingText };
+  async function recover() {
+    const operation = state.operation;
+    try {
+      const text = await root.AutomaticRevision.recover();
+      if (text && operation === state.operation && callbacks.onRecover) {
+        callbacks.onRecover(text);
+        nodes.editsGuard.textContent = "Сохранённый модельный проход восстановлен. Самостоятельно модель не запускается.";
+      }
+    } catch { nodes.editsGuard.textContent = "Не удалось прочитать сохранённый модельный проход. Вставьте сохранённый текст для новой обработки."; }
+  }
+  root.ReviewUI = { mount, update, reset, genreId, polishWithModel, recover, currentText: () => state.workingText };
 })(typeof globalThis !== "undefined" ? globalThis : window);

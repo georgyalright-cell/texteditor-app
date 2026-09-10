@@ -84,12 +84,12 @@ test("base cancellation cannot return partially processed document as complete",
   const result = await Processing.base([{ type: "paragraph", text: "First." }, photo], { process: (text) => ({ text }), isCurrent: () => current, progress: () => { current = false; } });
   assert.equal(result, null);
 });
-test("whole model queue covers prose after media with batches of at most five sentences", () => {
+test("whole model queue covers prose after media with batches of at most ten sentences", () => {
   const text = Array.from({ length: 12 }, (_, i) => `The company reviewed ${i + 1} regional contracts.`).join(" ");
   const job = Processing.jobs([{ type: "paragraph", text }, photo, table, { type: "paragraph", text: "A final statement." }]);
-  assert.equal(job.jobs.length, 4);
+  assert.equal(job.jobs.length, 3);
   for (const piece of job.jobs) {
-    assert.ok(EditPasses.sentenceSpans(piece.text, 0).length <= 5);
+    assert.ok(EditPasses.sentenceSpans(piece.text, 0).length <= 10);
     assert.equal(job.text.slice(piece.offset, piece.offset + piece.text.length), piece.text);
   }
 });

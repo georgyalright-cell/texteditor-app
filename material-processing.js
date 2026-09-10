@@ -10,7 +10,7 @@
     }
     return { text, ranges };
   }
-  function jobs(blocks) {
+  function jobs(blocks, { batchSize = 10, maxChars = 3500 } = {}) {
     const mapping = textMap(blocks), result = [];
     for (const range of mapping.ranges) {
       const text = blocks[range.index].text;
@@ -19,7 +19,7 @@
         .filter((s) => !frozen.some((r) => s.start < r.end && s.end > r.start));
       for (let i = 0; i < spans.length;) {
         const start = spans[i].start; let end = spans[i++].end, size = 1;
-        while (i < spans.length && size < 5 && !frozen.some((r) => end < r.end && spans[i].start > r.start)) {
+        while (i < spans.length && size < batchSize && spans[i].end - start <= maxChars && !frozen.some((r) => end < r.end && spans[i].start > r.start)) {
           end = spans[i++].end; size++;
         }
         result.push({ text: text.slice(start, end), offset: range.start + start });

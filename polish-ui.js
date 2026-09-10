@@ -5,6 +5,7 @@
 
   function cancel(reason) {
     sequence += 1;
+    if (root.AutomaticRevision) root.AutomaticRevision.cancel();
     if (root.ModelRunStatus) root.ModelRunStatus.cancel(reason);
     if (root.Generator) root.Generator.cancel();
     if (root.SemanticScorer) root.SemanticScorer.cancel();
@@ -27,7 +28,7 @@
       baseline: selector.deterministicScorer(options.language), engine,
       isCancelled: () => !current(), releaseGenerator: () => root.Generator.cancel(),
     });
-    const budget = { share: 0.35, limit: 5, shortlist: 2 };
+    const budget = { share: 0.35, limit: options.collect ? 10 : 5, shortlist: 2 };
     if (options.collect) budget.share = 1;
     if (!options.collect) root.RevisionPreview.clear();
     options.report("Редактирую текст. Варианты, прошедшие проверки, применяются автоматически.");
@@ -37,7 +38,7 @@
     try {
       const result = await selector.polishSentences(options.text, {
         ...settings, ...budget, language: options.language, preferFresh: true,
-        contextual: true, preview: true, score: ranker.score,
+        contextual: true, fullCoverage: Boolean(options.collect), preview: true, score: ranker.score,
         isCancelled: () => !current(),
         semanticScore: settings.semantic ? (pairs) => root.SemanticScorer.score(pairs) : undefined,
         generate: async (sentence, context) => {
@@ -53,6 +54,7 @@
       complete = true;
       result.modelUsed = modelUsed;
       result.modelLimited = Boolean(warnings) || Boolean(result.warnings && result.warnings.length) || ranker.limited();
+      result.rankingFailed = ranker.failed();
       for (const detail of result.details) detail.neural = ranker.pair(detail.before, detail.after);
       if (options.collect) { result.rankingSummary = ranker.summary(); options.collect(result); return; }
       if (!result.replaced) {

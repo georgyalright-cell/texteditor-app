@@ -54,6 +54,7 @@
     return {
       score,
       limited: () => Boolean(warning) || skipped > 0,
+      failed: () => Boolean(warning),
       pair: (before, after) => observations.has(before) && observations.has(after)
         ? { before: observations.get(before), after: observations.get(after) } : null,
       summary: () => warning || `Перплексия: сравнено ${checked} текстовых вариантов${skipped ? `; пропущено ${skipped} (нет полной оценки)` : ""}.`,

@@ -139,3 +139,9 @@
 .model-run-status[data-phase="error"],
 .model-run-status[data-phase="partial"] { border-left-color: #ae6a16; background: #fff7e9; }
 .model-run-status[data-phase="cancelled"] { border-left-color: #6b7280; background: #f5f5f5; }
+.model-help { position: relative; }
+.model-help summary { cursor: pointer; list-style: none; }
+.model-help summary::-webkit-details-marker { display: none; }
+.model-help[open] { grid-column: 1 / -1; width: 100%; }
+.model-help[open] summary { width: fit-content; }
+.model-help > div { max-width: 760px; padding: 0 16px; font-size: .9rem; line-height: 1.5; }

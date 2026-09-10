@@ -38,6 +38,7 @@ function fixture({ supported = true, interrupt = false } = {}) {
       if (!interrupt) collect({ details: [], warnings: [] });
     } },
   };
+  vm.runInNewContext(fs.readFileSync(require.resolve('./model-checkpoint.js'), 'utf8'), { window: root, structuredClone });
   vm.runInNewContext(fs.readFileSync(require.resolve('./material-workspace.js'), 'utf8'),
     { window: root, document: { getElementById: node }, structuredClone });
   const workspace = root.MaterialWorkspace.mount({ elements, otherBusy: () => false,
@@ -87,13 +88,13 @@ test('ordinary rebuild never resumes an interrupted model queue', async () => {
   assert.equal(calls.includes('resume'), true);
 });
 
-test('limited completed model pass remains retryable and keeps processed document', async () => {
+test('failed model batch does not advance and can resume without repeating base processing', async () => {
   const { workspace, calls, node, root } = fixture();
   root.PolishUI.run = async ({ collect }) => collect({ details: [], modelLimited: true, modelUsed: false, generatorWarnings: ['Failed to fetch'] });
   await workspace.run();
   const partial = await workspace.run({ withModel: true }); workspace.controls();
-  assert.equal(partial.limited, true); assert.equal(partial.completed, true);
-  assert.equal(node('polishButton').disabled, false); assert.equal(node('polishButton').textContent, 'Повторить обработку моделью');
+  assert.equal(partial.completed, false);
+  assert.equal(node('polishButton').disabled, false); assert.equal(node('polishButton').textContent, 'Продолжить обработку моделью');
   root.PolishUI.run = async ({ collect }) => collect({ details: [], modelUsed: true });
   const retried = await workspace.run({ withModel: true }); workspace.controls();
   assert.equal(retried.limited, false); assert.equal(retried.completed, true);

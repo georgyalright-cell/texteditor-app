@@ -19,11 +19,11 @@ test('full fragment uses every batch with automatic application and stable origi
   global.PolishUI = { run: async (options) => {
     calls++;
     const spans = EditPasses.sentenceSpans(options.text, 0);
-    assert.ok(spans.length <= 5);
+    assert.ok(spans.length <= 10);
     options.collect({ details: spans.map((s) => ({ start: s.start, end: s.end, before: s.text.trim(), after: s.text.trim().replace('reports', 'presents the') })) });
   } };
   const final = await automatic.run({ text: source, language: 'en', isCurrent: () => true, report() {}, apply: (value) => { result = value; } });
-  assert.equal(calls, 3); assert.equal(result.replaced, 12);
+  assert.equal(calls, 2); assert.equal(result.replaced, 12);
   assert.equal(final.text, source.replaceAll('reports', 'presents the'));
 });
 test('stale result cannot apply and incomplete batch keeps preceding applied work', async () => {
@@ -51,5 +51,6 @@ test('model and scoring fallbacks remain visible in compact diagnostics', async 
   global.PolishUI = { run: async (options) => options.collect({ details: [], generatorWarnings: ['Generator unavailable'], warnings: ['Semantic skipped'], rankingSummary: 'PPL unavailable' }) };
   const result = await automatic.run({ text: 'The team reports growth.', language: 'en', isCurrent: () => true, apply() {}, report: (value) => { message = value; } });
   assert.deepEqual(result.warnings, ['Generator unavailable', 'Semantic skipped', 'PPL unavailable']);
-  assert.match(message, /Generator unavailable.*Semantic skipped.*PPL unavailable/);
+  assert.match(message, /Generator unavailable.*Semantic skipped/);
+  assert.equal(result.completed, false);
 });
