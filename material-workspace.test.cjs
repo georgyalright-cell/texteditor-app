@@ -21,8 +21,8 @@ function fixture({ supported = true, interrupt = false } = {}) {
     MaterialView: { render() {} },
     DocumentImages: { validate() {} },
     FormatProfiles: { get: () => ({}) },
-    DocumentLayout: { arrange: b => ({ blocks: b, warnings: [] }), present: b => b },
-    ClipboardDocument: { read: async () => ({ blocks, warnings: [] }),
+    DocumentLayout: { prepare: b => b, arrange: b => ({ blocks: b, warnings: [] }), present: b => b },
+    ClipboardDocument: { validate() {}, read: async () => ({ blocks, warnings: [] }),
       textOf: b => b.map(x => x.text || '').join('\n') },
     DocumentBuilder: { assemble: ({ blocks }) => ({ blocks }) },
     TextPipeline: { run: text => ({ text }) },
@@ -43,7 +43,7 @@ function fixture({ supported = true, interrupt = false } = {}) {
   vm.runInNewContext(fs.readFileSync(require.resolve('./material-workspace.js'), 'utf8'),
     { window: root, document: { getElementById: node }, structuredClone });
   const workspace = root.MaterialWorkspace.mount({ elements, otherBusy: () => false,
-    profile: () => 'academic', metadata: () => ({}), update() {}, invalidate() {},
+    profile: () => 'academic', metadata: () => ({}), update() {}, invalidate() {}, enterWhole() {},
     result: result => { calls.push('assemble'); assert.equal(result.blocks[1].rows[1][0], '10'); } });
   workspace.setMode(true);
   return { workspace, calls, node, root };
@@ -101,4 +101,21 @@ test('failed model batch does not advance and can resume without repeating base 
   assert.equal(retried.limited, false); assert.equal(retried.completed, true);
   assert.equal(calls.filter(x => x === 'base').length, 1);
   assert.equal(node('polishButton').disabled, true);
+});
+test('older file import cannot release the pending state of a newer import',async()=>{
+  const {workspace,root,node}=fixture();const pending=[];
+  root.SourceDocx={read:()=>new Promise(resolve=>pending.push(resolve))};root.confirm=()=>true;
+  const first=workspace.loadFile({name:'first.docx'}),second=workspace.loadFile({name:'second.docx'});
+  pending[0]({blocks:[{type:'paragraph',text:'First',sourceDocx:{version:1}}],warnings:[]});
+  assert.equal(await first,'superseded');workspace.controls();assert.equal(node('processButton').disabled,true);
+  pending[1]({blocks:[{type:'paragraph',text:'Second',sourceDocx:{version:1}}],warnings:[]});
+  assert.equal(await second,'imported');workspace.controls();assert.equal(node('processButton').disabled,false);
+  assert.match(node('sourceText').value,/Second/);
+});
+test('a newer generic file or typed input can invalidate a pending DOCX before commit',async()=>{
+  const {workspace,root,node}=fixture();let resolve,current=true;
+  root.SourceDocx={read:()=>new Promise(r=>resolve=r)};
+  const promise=workspace.loadFile({name:'old.docx'},{isCurrent:()=>current});current=false;
+  resolve({blocks:[{type:'paragraph',text:'Must not replace new input',sourceDocx:{version:1}}],warnings:[]});
+  assert.equal(await promise,'superseded');assert.doesNotMatch(node('sourceText').value,/Must not replace/);
 });

@@ -239,6 +239,7 @@ summary:focus-visible,
 }
 
 .file-row {
+  flex-wrap: wrap;
   min-height: 43px;
   margin-top: 19px;
   display: flex;
@@ -877,6 +878,9 @@ summary:focus-visible,
 .material-table { overflow-x: auto; margin: 18px 0; max-width: 100%; white-space: normal; }
 .material-table table { border-collapse: collapse; width: 100%; font-size: 15px; }
 .material-table td, .material-table th { border: 1px solid #b8bfca; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 72px; }
+.material-table table[data-preserved-table] { width: auto; font-size: inherit; background: white; }
+.material-table table[data-preserved-table] td, .material-table table[data-preserved-table] th { border: none; padding: 0; min-width: 0; font-weight: normal; text-align: left; vertical-align: top; overflow-wrap: normal; }
+.material-table table[data-preserved-table] p { margin: 0; font: inherit; line-height: inherit; }
 .material-object { margin: 24px 0; min-width: 0; }
 .material-caption { margin: 8px 0; font-size: 15px; line-height: 1.4; }
 .material-layout-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: Arial, sans-serif; }

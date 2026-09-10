@@ -100,3 +100,10 @@ test("table headers repeat, short rows stay whole, long rows can split; no fixed
   assert.match(rows[0],/tblHeader/); assert.match(rows[1],/cantSplit/); assert.doesNotMatch(rows[2],/cantSplit/);
   assert.doesNotMatch(xml,/trHeight/);
 });
+test("whole-document layout applies only explicit caption edits, without automatic extra captions",()=>{
+  const input=[p('The text refers to Table 7.'),table(),p('Table 7. Existing'),table()];
+  const blocks=layout.prepare(input);assert.deepEqual(layout.presentEdits(blocks,profile),blocks);
+  blocks[3].layoutTitle='Changed';const result=layout.presentEdits(blocks,profile);
+  assert.equal(result.length,blocks.length);assert.equal(result[2].title,'Changed');
+  assert.deepEqual(result[1],blocks[1]);
+});

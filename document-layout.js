@@ -137,5 +137,14 @@
     }
     return result;
   }
-  return { mediaKind, caption, prepare, units, references, arrange, move, captions, label, present };
+  function presentEdits(blocks, profile) {
+    const result = structuredClone(blocks), labels = captions(blocks, profile);
+    for (const unit of units(blocks).slice().reverse()) {
+      if (!unit.kind || blocks[unit.index].layoutTitle === undefined) continue;
+      if (unit.captionIndex !== undefined && unit.captionIndex >= 0) result[unit.captionIndex] = { ...result[unit.captionIndex], title: blocks[unit.index].layoutTitle };
+      else result.splice(unit.index + (unit.kind === "figure" ? 1 : 0), 0, labels.get(unit.index));
+    }
+    return result;
+  }
+  return { mediaKind, caption, prepare, units, references, arrange, move, captions, label, present, presentEdits };
 });

@@ -81,10 +81,10 @@ test("в буфер уходит и разметка, и простой текс
   assert.deepEqual(Object.keys(written[0].parts).sort(), ["text/html", "text/plain"]);
 });
 
-test("без права на запись разметки уходит текст, а не ошибка", async () => {
+test("без права на запись разметки обычный текст остаётся доступен", async () => {
   let plain = "";
   class FakeItem {}
-  const result = await clipboard.copy(BLOCKS, {
+  const result = await clipboard.copy(BLOCKS.filter(b => b.type !== 'docTable'), {
     clipboard: {
       write: () => Promise.reject(new Error("отказано")),
       writeText: (value) => { plain = value; return Promise.resolve(); },
@@ -94,6 +94,16 @@ test("без права на запись разметки уходит текс
   assert.equal(result.format, "text");
   assert.match(result.message, /простой текст/u);
   assert.match(plain, /Выручка выросла на 12,5%/u);
+});
+
+test("таблицы не подменяются простым текстом при отказе clipboard HTML", async () => {
+  let writes=0;
+  await assert.rejects(clipboard.copy(BLOCKS, { ClipboardItem: class {}, clipboard:{
+    write:async()=>{throw new Error('Denied');}, writeText:async()=>{writes++;}
+  }}), /Скачайте DOCX/);
+  assert.equal(writes,0);
+  await assert.rejects(clipboard.copy(BLOCKS,{clipboard:{writeText:async()=>{writes++;}}}),/скачивание DOCX/);
+  assert.equal(writes,0);
 });
 
 test("пустой документ копировать нечего, и это сказано прямо", async () => {

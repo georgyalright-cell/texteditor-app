@@ -7,7 +7,8 @@
   }
   function create(options) {
     function basename(state) {
-      const source = state.kind === "document" ? state.topic || "course_project" : state.filename || "processed_text";
+      const original = state.blocks?.find(block => block.sourceDocx)?.sourceDocx.filename;
+      const source = original ? original.replace(/\.docx$/iu, "") : state.kind === "document" ? state.topic || "course_project" : state.filename || "processed_text";
       return source.replace(/[^\p{L}\p{N}_-]+/gu, "_").replace(/^_+|_+$/g, "").slice(0, 70) || "processed_text";
     }
     return {

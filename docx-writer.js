@@ -139,6 +139,7 @@
   }
 
   function tableXml(block, profile) {
+    if (block.tableFormat) return (globalThis.TableDocx || require("./table-docx.js")).xml(block, profile);
     const layout = profile.layout;
     const page = layout.page;
     const usableMm = page.widthMm - page.marginLeftMm - page.marginRightMm;
@@ -486,6 +487,11 @@
    * поэтому дополнительной зависимости не появляется.
    */
   async function createDocxBlob(blocks, profile, zipLibrary) {
+    if (blocks.some(block => block.sourceDocx)) {
+      const source = globalThis.SourceDocx;
+      if (!source) throw new Error("Модуль сохранения исходного DOCX не загрузился. Обновите страницу.");
+      return source.write(blocks);
+    }
     const JSZipRef = zipLibrary || (typeof window !== "undefined" ? window.JSZip : null);
     if (!JSZipRef) throw new Error("Библиотека упаковки не загрузилась. Обновите страницу.");
 

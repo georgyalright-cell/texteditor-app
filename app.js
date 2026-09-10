@@ -545,26 +545,18 @@
     elements.sourceText.focus();
   }
 
-  async function loadFile(file) {
-    if (!file) return;
-    if (material && material.active()) {
-      setStatus(elements.sourceStatus, "В режиме целой работы используйте вставку из буфера. Для прежнего импорта файла снимите флажок «Работа целиком».", true); return;
-    }
-    setStatus(elements.sourceStatus, `Читаю ${file.name}…`, false);
-    try {
-      const extracted = await window.DocumentReader.readFile(file);
+  const loadFile = window.DocumentFileInput.create({
+    material: () => material, source: elements.sourceText, inputs: [elements.fileInput, document.getElementById("wholeDocxInput")],
+    documentButton: document.getElementById("wholeDocxButton"), report: (text, error) => setStatus(elements.sourceStatus, text, error),
+    apply(file, extracted) {
       elements.sourceText.value = extracted;
       sourceFilename = file.name.replace(/\.[^.]+$/, "");
       resetResult();
       setStatus(elements.sourceStatus, `${file.name} · ${characterLabel(extracted.length)}`, false);
       updateControls();
       elements.sourceText.focus();
-    } catch (error) {
-      setStatus(elements.sourceStatus, error instanceof Error ? error.message : "Не удалось прочитать файл.", true);
-    } finally {
-      elements.fileInput.value = "";
     }
-  }
+  });
 
   async function clearCurrent() {
     const clearingText = elements.sourceText.value, clearingMode = currentMode;
@@ -614,7 +606,6 @@
       runProcessing();
     }
   });
-  elements.fileInput.addEventListener("change", () => loadFile(elements.fileInput.files[0]));
   elements.processButton.addEventListener("click", runProcessing);
   document.getElementById("polishButton").addEventListener("click", () => {
     if (material && material.active()) return window.ModelRunStatus ? window.ModelRunStatus.track(() => material.run({ withModel: true })) : material.run({ withModel: true });
@@ -680,6 +671,7 @@
 
   material = window.MaterialWorkspace.mount({
     elements, otherBusy: () => processing.busy(), profile: selectedProfileId,
+    enterWhole: () => setMode("project"),
     metadata: () => window.WorkProject.toBuilderMetadata(project), update: updateControls, invalidate: resetResult,
     result(assembled, changed) {
       currentBlocks = assembled.blocks; currentOutputKind = "document"; currentOutputProfileId = assembled.profile.id; currentProcessedPart = "";
@@ -688,7 +680,7 @@
       const missing = [...assembled.blanks, ...assembled.inserted];
       setResultState(missing.length ? "Документ собран · проверьте комплектность" : "Документ собран", missing.length ? "neutral" : "success");
       renderCompliance({ problems: missing.length ? [{ title: "Проверьте недостающие данные и разделы", items: missing }] : [], notes: [] });
-      setStatus(elements.resultNote, "Текст обработан. Размещение соответствует предпросмотру; титульные страницы и оглавление добавлены. TXT не содержит фотографий — для полной работы скачайте DOCX.", false);
+      setStatus(elements.resultNote, "Текст обработан. Порядок блоков сохранён; новые титульные страницы не добавляются. Для сохранения таблиц и оформления скачайте DOCX.", false);
     },
   });
   fillProfiles();

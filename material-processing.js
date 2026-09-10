@@ -45,7 +45,7 @@
   // recognition at a batch boundary. Reject that proposal, not the whole job.
   function accept(blocks, previous, proposals) {
     const source = textMap(blocks).text;
-    const valid = result => { const text = textMap(result).text; return source === text || guard().compare(source, text).ok; };
+    const valid = result => { const text = textMap(result).text; return (source === text || guard().compare(source, text).ok) && (!root.SourceDocx || root.SourceDocx.integrity(result).ok); };
     let details = previous.slice(), output = apply(blocks, details), rejected = 0;
     if (!valid(output)) throw new Error("Сохранённые правки не прошли проверку ссылок и чисел. Исходный текст не изменён.");
     try {
@@ -71,8 +71,10 @@
         // Existing scripts remain intact; a final anchor check also protects
         // the surrounding document from a changed number/citation in one block.
         if (root.AnchorGuard.compare(block.text, processed.text).ok) {
-          if (block.text !== processed.text) changed++;
+          const before = block.text;
           block.text = processed.text;
+          if (root.SourceDocx && !root.SourceDocx.integrity(result).ok) { block.text = before; warnings.add("Сохранён исходный абзац: проверка защитила ссылки и числа в контексте документа."); }
+          else if (before !== block.text) changed++;
         } else warnings.add(`Блок ${index + 1}: сохранён оригинал из-за изменения чисел или ссылок.`);
         for (const warning of processed.warnings || []) warnings.add(warning);
       }

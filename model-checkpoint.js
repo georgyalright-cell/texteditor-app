@@ -1,6 +1,19 @@
 (function attach(root) {
   "use strict";
   const VERSION = 2;
+  function sameData(a, b, depth = 0) {
+    if (a === b) return true;
+    if (depth > 80 || !a || !b || typeof a !== "object" || typeof b !== "object") return false;
+    if (ArrayBuffer.isView(a) || ArrayBuffer.isView(b)) {
+      if (!ArrayBuffer.isView(a) || !ArrayBuffer.isView(b) || a.byteLength !== b.byteLength) return false;
+      const left = new Uint8Array(a.buffer, a.byteOffset, a.byteLength), right = new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
+      for (let i = 0; i < left.length; i++) if (left[i] !== right[i]) return false;
+      return true;
+    }
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every(key => Object.hasOwn(b, key) && sameData(a[key], b[key], depth + 1));
+  }
   function create(base) {
     return { version: VERSION, base: structuredClone(base), ...root.MaterialProcessing.jobs(base),
       cursor: 0, details: [], limited: false, modelUsed: false, reasons: [] };
@@ -14,10 +27,11 @@
       if (!Number.isInteger(saved.cursor) || saved.cursor < 0 || saved.cursor > job.jobs.length) return null;
       if (!saved.details.every(d => job.jobs.slice(0, saved.cursor).some(p => d.start >= p.offset && d.end <= p.offset + p.text.length))) return null;
       const output = root.MaterialProcessing.apply(job.base, saved.details);
-      if (JSON.stringify(output) !== JSON.stringify(processed)) return null;
+      if (!sameData(output, processed)) return null;
       const before = root.MaterialProcessing.textMap(job.base).text, after = root.MaterialProcessing.textMap(output).text;
       const guard = root.AnchorGuard || (typeof require === "function" ? require("./anchor-guard.js") : null);
       if (before !== after && (!guard || !guard.compare(before, after).ok)) return null;
+      if (root.SourceDocx && !root.SourceDocx.integrity(output).ok) return null;
       return Object.assign(job, { cursor: saved.cursor, details: saved.details, limited: Boolean(saved.limited),
         modelUsed: Boolean(saved.modelUsed), reasons: Array.isArray(saved.reasons) ? saved.reasons.filter(s => typeof s === "string") : [] });
     } catch { return null; }
@@ -33,7 +47,7 @@
     if (root.ModelRunStatus && root.ModelRunStatus.batch) root.ModelRunStatus.batch(job.cursor, job.jobs.length);
     return text;
   }
-  const api = { create, restore, failure, progress };
+  const api = { create, restore, failure, progress, sameData };
   root.ModelCheckpoint = api;
   if (typeof module === "object" && module.exports) module.exports = api;
 })(typeof window === "object" ? window : globalThis);

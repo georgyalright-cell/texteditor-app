@@ -10,6 +10,7 @@
     let modelJob = null, modelUndo = null, notes = [], changed = 0, pasteRevision = 0, contentRevision = 0;
     let storageNotice = "", lastReport = "";
     const active = () => projectMode && toggle.checked;
+    const nativeDocument = () => source.some(block => block.sourceDocx);
     function report(message, error = false) {
       if (error && root.ModelRunStatus) root.ModelRunStatus.progress({ message, isError: true });
       lastReport = message;
@@ -41,7 +42,9 @@
       preview.hidden = !active() || !source.length;
       e.sourceText.hidden = active() && source.length > 0;
       e.sourceCount.hidden = active() && source.length > 0;
-      e.fileInput.closest(".file-row").hidden = active();
+      e.fileInput.closest(".file-row").hidden = false;
+      document.getElementById("copyBackButton").hidden = active() && nativeDocument();
+      e.profileBar.hidden = !projectMode || active(); e.metadata.hidden = !projectMode || active();
       e.partFields.hidden = !projectMode || active();
       e.partsLibrary.hidden = !projectMode || active();
       e.projectWorkspace.hidden = !projectMode || active();
@@ -63,7 +66,7 @@
       polishButton.disabled = !processed || busy || pendingPaste || options.otherBusy() || !root.Generator.supported() || Boolean(modelComplete);
       polishButton.textContent = modelComplete ? (modelJob.limited ? "Проход завершён с ограничениями" : "Обработка моделью завершена") : modelJob ? "Продолжить обработку моделью" : "Дополнительно обработать моделью";
       e.clearButton.disabled = !available && !busy;
-      e.sourceTitle.textContent = "Работа целиком из буфера";
+      e.sourceTitle.textContent = nativeDocument() ? "Исходный документ" : "Работа целиком из буфера";
       e.sourceText.placeholder = "Вставьте работу целиком";
       document.getElementById("polishCancelButton").hidden = !busy && !options.otherBusy();
       const missing = source.some((block) => block.type === "imageMissing");
@@ -87,7 +90,7 @@
         invalidate(true);
         for (const i of group.indices.slice().reverse()) { source.splice(i, 1); if (processed) processed.splice(i, 1); if (modelUndo) modelUndo.blocks.splice(i, 1); }
         save(); display(); summary();
-      }, { profile: root.FormatProfiles.get(options.profile()), edit: editLayout });
+      }, nativeDocument() ? undefined : { profile: root.FormatProfiles.get(options.profile()), edit: editLayout, preserve: true });
       e.sourceText.value = root.ClipboardDocument.textOf(source); options.update(); controls();
     }
     function editLayout(index, action, value) {
@@ -110,9 +113,10 @@
       if (order) report("Размещение и подпись сохранены. Принятые правки текста сохранены; неподтверждённые предложения сброшены.");
     }
     function acceptImport(imported) {
-      const layout = root.DocumentLayout.arrange(imported.blocks);
-      source = layout.blocks; notes = [...imported.warnings, ...layout.warnings];
-      if (layout.moved) notes.push(`По явным ссылкам в тексте размещено объектов: ${layout.moved}. Проверьте расположение ниже.`);
+      if (imported.blocks.some(block => block.sourceDocx)) {
+        source = imported.blocks; notes = imported.warnings; return;
+      }
+      source = root.DocumentLayout.prepare(imported.blocks); notes = imported.warnings;
     }
     function summary() {
       const tables = source.filter((b) => b.type === "docTable" || b.type === "table").length;
@@ -121,7 +125,9 @@
       report(`Вставлено: ${source.length} блоков, таблиц ${tables}, фото ${photos}. ${missing ? `Недоступных фото: ${missing}. Прикрепите файлы ниже — до этого экспорт заблокирован. ` : ""}${notes.join(" ")} Черновик хранится в этом браузере; новая вставка заменяет его.`, missing > 0);
     }
     async function paste(event) {
-      if (!active() || !event.clipboardData) return;
+      if (!event.clipboardData) return;
+      const richTable = /<table(?:\s|>)/iu.test(event.clipboardData.getData("text/html"));
+      if (!active() && !richTable) return;
       if (event.target !== e.sourceText && event.target.closest("input, textarea")) return;
       event.preventDefault();
       if (source.length && !root.confirm("Заменить текущий документ материалом из буфера?")) return;
@@ -134,17 +140,18 @@
       try {
         const imported = await root.ClipboardDocument.read({ getData: (type) => type === "text/html" ? html : text, files }, document);
         if (generation !== operation) return;
+        if (!active()) { toggle.checked = true; options.enterWhole(); }
         invalidate(); acceptImport(imported); save(); display(); summary();
       } catch (error) { if (generation === operation) report(`Вставка не применена, прежний материал сохранён. ${error.message}`, true); }
       finally { if (ticket === pasteRevision) pendingPaste = false; options.update(); }
     }
     function assemble(blocks) {
       root.DocumentImages.validate(blocks);
-      const arranged = root.DocumentLayout.present(blocks, root.FormatProfiles.get(options.profile()));
-      const assembled = root.DocumentBuilder.assemble({ blocks: arranged, text: root.ClipboardDocument.textOf(arranged),
-        preserveOrder: true, profileId: options.profile(), metadata: options.metadata() });
-      options.result(assembled, changed);
-      return assembled;
+      const profile = root.FormatProfiles.get(options.profile());
+      const finalBlocks = !nativeDocument() && root.DocumentLayout.presentEdits ? root.DocumentLayout.presentEdits(blocks, profile) : blocks;
+      const assembled = { blocks: structuredClone(finalBlocks), profile,
+        blanks: [], inserted: [], sourcePreserved: true };
+      options.result(assembled, changed); return assembled;
     }
     function showChoices() {
       if (!modelUndo || !modelUndo.details.length || !active()) return;
@@ -244,7 +251,7 @@
       if (draft.processed) root.ClipboardDocument.validate(draft.processed);
       for (const block of draft.source) if (block.type === "image") await root.DocumentImages.decode(block.dataUrl);
       if (contentRevision !== initialContent || e.sourceText.value) return;
-      source = root.DocumentLayout.prepare(draft.source); notes = Array.isArray(draft.notes) ? draft.notes : [];
+      source = draft.source.some(block => block.sourceDocx) ? draft.source : root.DocumentLayout.prepare(draft.source); notes = Array.isArray(draft.notes) ? draft.notes : [];
       processed = draft.processed ? draft.processed.map((b, i) => source[i].type !== draft.source[i].type ? structuredClone(source[i]) : b) : null;
       changed = Number(draft.changed) || 0;
       modelJob = root.ModelCheckpoint.restore(draft.modelJob, processed);
@@ -257,7 +264,25 @@
     }).catch(() => report("Сохранённый черновик недоступен. Можно вставить материал заново.", true));
     return {
       ready, active, controls, run, cancel, busy: () => busy,
-      setMode(value) { if (value !== projectMode) cancel(); projectMode = value; if (active() && source.length) { display(); showChoices(); } controls(); },
+      async loadFile(file, { isCurrent = () => true } = {}) {
+        if (!/\.docx$/iu.test(file.name)) return false;
+        if (busy || options.otherBusy()) throw new Error("Дождитесь завершения текущей обработки или остановите её.");
+        if (source.length && !root.confirm("Заменить текущий документ загруженным файлом?")) return "cancelled";
+        contentRevision++; cancel(); const operation = generation, ticket = pasteRevision;
+        pendingPaste = true; options.update();
+        try {
+          const imported = await root.SourceDocx.read(file, document);
+          if (operation !== generation || !isCurrent()) return "superseded";
+          root.ClipboardDocument.validate(imported.blocks);
+          toggle.checked = true; options.enterWhole();
+          invalidate(); acceptImport(imported); const committed = generation; await save();
+          if (generation !== committed) return "superseded";
+          display();
+          report("Документ загружен целиком. Обрабатывается только текст вне таблиц; исходные таблицы и оформление DOCX сохраняются. Нажмите «Обработать и собрать документ».");
+          return "imported";
+        } finally { if (ticket === pasteRevision) pendingPaste = false; options.update(); }
+      },
+      setMode(value) { if (value !== projectMode) cancel(); projectMode = value; if (active() && source.length) { display(); if (processed) assemble(processed); showChoices(); } controls(); },
       invalidate(keepProcessed = false) { cancel(); modelJob = null; if (!keepProcessed) { contentRevision++; processed = null; modelUndo = null; } else { save(); showChoices(); } },
       async clear() {
         invalidate(); const operation = generation; source = []; notes = [];

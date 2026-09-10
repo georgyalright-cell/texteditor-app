@@ -29,6 +29,9 @@
         }
       } else if (block.type === "docTable" || block.type === "table") {
         node = document.createElement("div"); node.className = "material-table";
+        if (block.tableFormat) {
+          node.append(root.TableFormat.render(block, document));
+        } else {
         const table = document.createElement("table");
         const rows = block.type === "docTable" ? [block.columns, ...block.rows] : block.lines.map((line) => line.split("\t"));
         rows.forEach((row, r) => {
@@ -36,6 +39,7 @@
           for (const value of row) { const cell = document.createElement(r ? "td" : "th"); cell.textContent = value; tr.append(cell); }
           table.append(tr);
         }); node.append(table);
+        }
       } else {
         node = document.createElement(block.type === "heading" ? "h3" : "p");
         node.textContent = block.type === "toc" ? "Оглавление — обновляется в Word" : block.type === "caption" ? root.DocumentLayout.label(block) : block.title || block.text || (block.lines || []).join("\n");
@@ -45,6 +49,7 @@
         const wrapper = document.createElement("section"); wrapper.className = "material-object";
         const c = labels.get(index), caption = document.createElement("p"); caption.className = "material-caption";
         caption.textContent = root.DocumentLayout.label(c); caption.style.textAlign = c.alignment;
+        caption.hidden = Boolean(layout.preserve && unit.captionIndex < 0 && block.layoutTitle === undefined);
         wrapper.append(...(c.position === "above" ? [caption, node] : [node, caption]));
         for (const i of unit.indices) if (i !== index && i !== unit.captionIndex) {
           const note = document.createElement("p"); note.textContent = blocks[i].text; wrapper.append(note);
@@ -69,6 +74,7 @@
         input.addEventListener("change", () => {
           editable(index, "caption", input.value);
           caption.textContent = root.DocumentLayout.label({ ...c, title: input.value.slice(0, 500) });
+          caption.hidden = false;
         }); field.append(input); tools.append(field);
         wrapper.insertBefore(tools, node); target.append(wrapper);
       } else target.append(node);

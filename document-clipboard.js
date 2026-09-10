@@ -34,6 +34,11 @@
   }
 
   function tableHtml(block) {
+    if (block.tableFormat) return (root.TableFormat || require("./table-format.js")).html(block);
+    if (block.type === "table" && block.lines) {
+      const matrix = block.lines.map(line => line.split("\t"));
+      block = { columns: matrix[0] || [], rows: matrix.slice(1) };
+    }
     const columns = block.columns || [];
     const rows = block.rows || [];
     const head = columns.length
@@ -151,6 +156,7 @@
     const settings = options || {};
     const list = Array.isArray(blocks) ? blocks : [];
     if (!list.length) throw new Error("Нечего копировать: документ пуст.");
+    if (list.some(block => block.sourceDocx)) throw new Error("Для сохранения исходных таблиц, изображений и страниц скачайте DOCX. Копирование из предпросмотра не заменяет исходный файл.");
     const markup = html(list);
     const text = plain(list);
     const clipboard = settings.clipboard || (typeof navigator === "object" ? navigator.clipboard : null);
@@ -170,9 +176,11 @@
         ]);
         return { format: "html", message: describe(list) };
       } catch (error) {
+        if (list.some(b => b.type === "docTable" || b.type === "table")) throw new Error("Браузер не разрешил копирование таблиц с оформлением. Скачайте DOCX — таблицы сохранятся в нём. Простой текст не подставлен вместо таблиц.");
         if (typeof clipboard.writeText !== "function") throw error;
       }
     }
+    if (list.some(b => b.type === "docTable" || b.type === "table")) throw new Error("Этот браузер не поддерживает копирование таблиц с оформлением. Используйте скачивание DOCX.");
     if (typeof clipboard.writeText !== "function") throw new Error("Браузер не даёт записать в буфер обмена.");
     await clipboard.writeText(text);
     return {

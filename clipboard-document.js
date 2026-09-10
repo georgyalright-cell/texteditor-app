@@ -60,15 +60,11 @@
       }
       if (tag === "TABLE") {
         flush();
-        if (node.querySelector("table, img, svg, math")) throw new Error("Вложенные таблицы, формулы и фото внутри ячеек пока не поддерживаются. Вынесите их отдельными блоками.");
-        const rows = Array.from(node.querySelectorAll("tr"), (row) => Array.from(row.children).filter((c) => /^(TD|TH)$/u.test(c.tagName)));
-        if (rows.some((row) => row.some((c) => Number(c.getAttribute("rowspan") || 1) !== 1 || Number(c.getAttribute("colspan") || 1) !== 1))) throw new Error("Разъедините объединённые ячейки перед вставкой: в этой версии поддерживаются прямоугольные таблицы.");
-        const matrix = rows.filter((row) => row.length).map((row) => row.map((cell) => contentText(cell).trim()));
-        if (!matrix.length) return;
-        if (matrix.length > 1000 || matrix[0].length > 30 || matrix.some((row) => row.length !== matrix[0].length)) throw new Error("Нужна прямоугольная таблица до 1000 строк и 30 столбцов.");
+        if (!root.TableFormat) throw new Error("Модуль сохранения таблиц не загрузился. Обновите страницу.");
+        const block = root.TableFormat.fromHtml(node, doc);
         const caption = node.querySelector("caption"), tableOwner = ++ownerId;
         if (caption) blocks.push({ ...root.DocumentLayout.caption(contentText(caption).trim(), "table"), layoutOwner: tableOwner });
-        blocks.push({ type: "docTable", columns: matrix[0], rows: matrix.slice(1), layoutOwner: tableOwner }); return;
+        blocks.push({ ...block, layoutOwner: tableOwner }); return;
       }
       if (/^H[1-6]$/u.test(tag)) {
         flush(); if (node.querySelector("img")) throw new Error("Вынесите фото из заголовка отдельным блоком.");
@@ -150,8 +146,10 @@
     return value;
   }
   function validate(blocks) {
-    if (blocks.length > 3000 || textOf(blocks).length > MAX_TEXT) throw new Error("Лимит документа — 3000 блоков и 200 000 символов.");
+    const maxText = blocks.some(block => block.sourceDocx) ? 1000000 : MAX_TEXT;
+    if (blocks.length > 3000 || textOf(blocks).length > maxText) throw new Error(`Лимит документа — 3000 блоков и ${maxText} символов.`);
     for (const block of blocks) {
+      if (block.tableFormat) root.TableFormat.normalize(block);
       const matrix = block.type === "docTable" ? [block.columns, ...block.rows] : block.type === "table" ? block.lines.map((line) => line.split("\t")) : null;
       if (matrix && (matrix.length > 1000 || matrix.some((row) => row.length > 30 || row.length !== matrix[0].length))) throw new Error("Нужна прямоугольная таблица до 1000 строк и 30 столбцов.");
     }
